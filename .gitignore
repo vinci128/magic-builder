@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Scryfall cache (large download, auto-refreshed)
+.cache/
+
+# Deck output files (generated artifacts)
+deck_output.txt
+deck_output.decklist.txt
+
+# Personal collection CSV (potentially private)
+# Remove this line if you want to include your collection
+ManaBox_Collection.csv
+
+# Env / secrets
+.env
