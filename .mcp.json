@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "magic-builder": {
+      "command": "/home/vinci/magic_builder/.venv/bin/python",
+      "args": ["/home/vinci/magic_builder/mcp_server.py"]
+    }
+  }
+}
