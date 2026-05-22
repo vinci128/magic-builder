@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from mcp.server.fastmcp import FastMCP
 
 from collection import parse_collection
+from arena_collection import parse_arena_collection, detect_collection_format
 from card_data import load_scryfall_lookup, enrich_collection
 from commander import find_commanders
 from deck_builder import build_deck, synergy_score
@@ -22,23 +23,28 @@ CSV_PATH = str(Path(__file__).parent / "ManaBox_Collection.csv")
 _cache: dict = {}
 
 
-def _get_enriched_collection(csv_path: str) -> list:
-    if csv_path in _cache:
-        return _cache[csv_path]
-    owned = parse_collection(csv_path)
-    lookup = load_scryfall_lookup()
+def _get_enriched_collection(collection_path: str) -> list:
+    if collection_path in _cache:
+        return _cache[collection_path]
+    fmt = detect_collection_format(collection_path)
+    if fmt == "arena":
+        lookup, by_set_cn = load_scryfall_lookup(also_by_set_cn=True)
+        owned = parse_arena_collection(collection_path, by_set_cn)
+    else:
+        owned = parse_collection(collection_path)
+        lookup = load_scryfall_lookup()
     enrich_collection(owned, lookup)
-    _cache[csv_path] = owned
+    _cache[collection_path] = owned
     return owned
 
 
 @mcp.tool()
 def list_commanders(csv_path: str = CSV_PATH) -> str:
-    """List the top commander candidates from a ManaBox collection CSV, scored by how many
-    compatible cards exist in the collection.
+    """List the top commander candidates from a collection file, scored by how many
+    compatible cards exist in the collection. Accepts ManaBox CSV or Arena export format.
 
     Args:
-        csv_path: Path to the ManaBox collection CSV file.
+        csv_path: Path to a ManaBox CSV or MTG Arena collection export file.
 
     Returns:
         JSON list of top commanders with name, color identity, oracle text, and score.
@@ -66,7 +72,7 @@ def build_commander_deck(commander_name: str, csv_path: str = CSV_PATH) -> str:
 
     Args:
         commander_name: Exact name of the chosen commander (must be in the collection).
-        csv_path: Path to the ManaBox collection CSV file.
+        csv_path: Path to a ManaBox CSV or MTG Arena collection export file.
 
     Returns:
         JSON object with commander details and the full 99-card list, each card annotated
@@ -136,7 +142,7 @@ def get_collection_stats(csv_path: str = CSV_PATH) -> str:
     """Return high-level statistics about the card collection.
 
     Args:
-        csv_path: Path to the ManaBox collection CSV file.
+        csv_path: Path to a ManaBox CSV or MTG Arena collection export file.
 
     Returns:
         JSON with total unique cards, color distribution, rarity breakdown, and

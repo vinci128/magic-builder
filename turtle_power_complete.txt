@@ -1,0 +1,96 @@
+Commander
+1 Leonardo, the Balance (TMC) 1
+
+Deck
+1 Acidic Slime (M12) 161
+1 April O'Neil, Live on the Scene (TMC) 9
+1 Arcane Signet (ANB) 117
+1 Ash Barrens (J25) 154
+1 Assassin's Trophy (GRN) 152
+1 Baxter, Fly in the Ointment (TMC) 10
+1 Bebop, Skull & Crossbones (TMC) 15
+1 Biogenic Ooze (RNA) 122
+1 Blasphemous Act (TLE) 26
+1 Casey Jones, Back Alley Brute (TMC) 22
+1 Chromatic Lantern (BRR) 10
+1 Cinder Glade (BFZ) 235
+1 Command Tower (ANB) 118
+1 Cultivate (M21) 177
+1 Donatello, the Brains (TMC) 2
+1 Dragonskull Summit (XLN) 252
+1 Escape Tunnel (MKM) 261
+1 Everything Pizza (TMT) 173
+1 Evolving Wilds (ANB) 111
+1 Fabled Passage (ELD) 244
+4 Forest (XLN) 276
+1 Harmonize (STA) 52
+1 Heroes in a Half Shell (TMC) 6
+1 Hinterland Harbor (DAR) 240
+1 Irma, Part-Time Mutant (TMC) 12
+2 Island (XLN) 264
+1 Krang, the All-Powerful (TMC) 13
+1 Leatherhead, Iron Gator (TMC) 30
+1 Lessons from Life (TMT) 155
+1 Lita, Little Orphan Amphibian (TMT) 19
+1 Michelangelo, the Heart (TMC) 5
+1 Mona Lisa, Science Geek (TMT) 123
+2 Mountain (XLN) 272
+2 Plains (XLN) 260
+1 Raphael, the Muscle (TMC) 4
+1 Rat King, Pale Piper (TMC) 19
+1 Ray Fillet, Wave Warrior (TMC) 14
+1 Rocksteady, Mutant Marauder (TMC) 33
+1 Rootbound Crag (XLN) 256
+1 Shredder, Shadow Master (TMC) 20
+1 Smoldering Marsh (BFZ) 247
+1 Splinter, the Mentor (TMC) 3
+1 Steelbane Hydra (ELD) 322
+1 Sunken Hollow (BFZ) 249
+2 Swamp (XLN) 268
+1 Tempestra, Dame of Games (TMC) 27
+1 Thriving Grove (JMP) 34
+1 Thriving Isle (JMP) 36
+1 Thriving Moor (JMP) 37
+1 Tokka & Rahzar, Unsupervised (TMC) 28
+1 Turtle Lair (TMT) 190
+1 Vanquish the Horde (MID) 41
+1 Vibrant Cityscape (OM1) 188
+1 Voracious Hydra (M20) 200
+1 Burrog Barrage (SOS) 141
+1 Brightclimb Pathway (ZNR) 259
+1 Dreamroot Cascade (VOW) 262
+1 Temple of Enlightenment (THB) 246
+1 Temple of Malady (FDN) 700
+1 Temple of Plenty (THB) 248
+1 Temple of Epiphany (FDN) 699
+1 Temple of Triumph (FDN) 705
+1 Azorius Guildgate (FDN) 683
+1 Golgari Guildgate (FDN) 689
+1 Gruul Guildgate (FDN) 690
+1 Circuitous Route (FDN) 635
+1 Midnight Clock (ELD) 54
+1 Phyrexian Arena (FDN) 180
+1 Overflowing Insight (ANB) 30
+1 Return of the Wildspeaker (ELD) 172
+1 Chart a Course (FDN) 586
+1 Niv-Mizzet, Visionary (FDN) 123
+1 Eat to Extinction (THB) 90
+1 Soul Shatter (ZNR) 127
+1 Banish into Fable (ELD) 325
+1 Elspeth Conquers Death (THB) 13
+1 Realm-Cloaked Giant (ELD) 26
+1 Rise of the Dark Realms (FDN) 183
+1 Titan of Industry (SNC) 159
+1 Luminous Broodmoth (IKO) 21
+1 Terror of the Peaks (M21) 164
+1 God-Eternal Oketra (WAR) 16
+1 Massacre Wurm (M21) 114
+1 Carnage Tyrant (XLN) 179
+1 Aurelia, the Warleader (FDN) 651
+1 Vizier of the Menagerie (FDN) 649
+1 Kroxa, Titan of Death's Hunger (THB) 221
+1 Hullbreaker Horror (VOW) 63
+1 Etali, Primal Storm (RIX) 100
+1 Kiora Bests the Sea God (THB) 52
+1 Sorin, Vengeful Bloodlord (WAR) 217
+1 Angelic Destiny (FDN) 565

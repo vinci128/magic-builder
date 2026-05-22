@@ -44,12 +44,22 @@ def _download_bulk_data():
     print("\nDownload complete.")
 
 
-def load_scryfall_lookup() -> dict:
+def load_scryfall_lookup(also_by_set_cn: bool = False):
+    """Return the Scryfall lookup dict keyed by card ID.
+
+    If also_by_set_cn is True, returns a tuple (by_id, by_set_cn) where
+    by_set_cn is keyed by (set_code_lower, collector_number_lower).
+    Both indices are built in a single file read.
+    """
     _download_bulk_data()
     print("Loading card database into memory...")
     with open(CACHE_FILE, encoding="utf-8") as f:
         cards = json.load(f)
-    return {card["id"]: card for card in cards}
+    by_id = {c["id"]: c for c in cards}
+    if also_by_set_cn:
+        by_set_cn = {(c["set"], c["collector_number"].lower()): c for c in cards}
+        return by_id, by_set_cn
+    return by_id
 
 
 def enrich_collection(owned_cards: list, scryfall_lookup: dict):

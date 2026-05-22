@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from collection import parse_collection
+from arena_collection import parse_arena_collection, detect_collection_format
 from card_data import load_scryfall_lookup, enrich_collection
 from commander import find_commanders
 from deck_builder import build_deck
@@ -14,7 +15,7 @@ from output import print_and_save
 
 
 @click.command()
-@click.argument("csv_path", default="ManaBox_Collection.csv")
+@click.argument("collection_path", default="ManaBox_Collection.csv")
 @click.option("--output", "-o", default="deck_output.txt", show_default=True, help="Output file path.")
 @click.option("--no-ai", is_flag=True, help="Skip Claude AI review (no ANTHROPIC_API_KEY needed).")
 @click.option(
@@ -24,20 +25,29 @@ from output import print_and_save
     metavar="N",
     help="Use the Nth-best scoring commander instead of the top one.",
 )
-def main(csv_path: str, output: str, no_ai: bool, pick: int):
-    """Build a Commander deck from your ManaBox collection CSV.
+def main(collection_path: str, output: str, no_ai: bool, pick: int):
+    """Build a Commander deck from your collection.
 
-    Reads your collection, selects the best commander by heuristic scoring,
-    assembles 99 cards by functional role + synergy, and optionally asks
-    Claude for a strategic review.
+    Accepts a ManaBox CSV export or an MTG Arena collection/deck export
+    (lines of the form: N Card Name (SET) collector#).
+
+    Selects the best commander by heuristic scoring, assembles 99 cards
+    by functional role + synergy, and optionally asks Claude for a review.
     """
     # ── 1. Parse collection ────────────────────────────────────────────────
-    print(f"Parsing collection: {csv_path}")
-    owned = parse_collection(csv_path)
+    fmt = detect_collection_format(collection_path)
+    print(f"Parsing collection: {collection_path} (format: {fmt})")
+
+    if fmt == "arena":
+        lookup, by_set_cn = load_scryfall_lookup(also_by_set_cn=True)
+        owned = parse_arena_collection(collection_path, by_set_cn)
+    else:
+        owned = parse_collection(collection_path)
+        lookup = load_scryfall_lookup()
+
     print(f"Found {len(owned)} unique card(s) in your collection.")
 
     # ── 2. Enrich with Scryfall metadata ──────────────────────────────────
-    lookup = load_scryfall_lookup()
     enrich_collection(owned, lookup)
 
     # ── 3. Find commander candidates ──────────────────────────────────────
