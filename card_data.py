@@ -6,7 +6,7 @@ import requests
 
 CACHE_DIR = Path(".cache")
 CACHE_FILE = CACHE_DIR / "scryfall_default_cards.json"
-CACHE_TTL = 86400  # 24 hours
+CACHE_TTL = 7 * 86400  # 7 days — bulk data barely changes between set releases
 
 
 def _is_cache_fresh() -> bool:
@@ -44,22 +44,22 @@ def _download_bulk_data():
     print("\nDownload complete.")
 
 
-def load_scryfall_lookup(also_by_set_cn: bool = False):
-    """Return the Scryfall lookup dict keyed by card ID.
+_scryfall_cache: tuple | None = None
 
-    If also_by_set_cn is True, returns a tuple (by_id, by_set_cn) where
-    by_set_cn is keyed by (set_code_lower, collector_number_lower).
-    Both indices are built in a single file read.
-    """
+
+def load_scryfall_lookup() -> tuple[dict, dict]:
+    """Return (by_id, by_set_cn) built from a single file read, cached in-process."""
+    global _scryfall_cache
+    if _scryfall_cache is not None:
+        return _scryfall_cache
     _download_bulk_data()
     print("Loading card database into memory...")
     with open(CACHE_FILE, encoding="utf-8") as f:
         cards = json.load(f)
     by_id = {c["id"]: c for c in cards}
-    if also_by_set_cn:
-        by_set_cn = {(c["set"], c["collector_number"].lower()): c for c in cards}
-        return by_id, by_set_cn
-    return by_id
+    by_set_cn = {(c["set"].lower(), c["collector_number"].lower()): c for c in cards}
+    _scryfall_cache = (by_id, by_set_cn)
+    return _scryfall_cache
 
 
 def enrich_collection(owned_cards: list, scryfall_lookup: dict):
@@ -70,15 +70,16 @@ def enrich_collection(owned_cards: list, scryfall_lookup: dict):
         if not data:
             missing += 1
             continue
+        front = data.get("card_faces", [{}])[0]  # MDFCs / adventures keep stats on the front face
         card.color_identity = data.get("color_identity", [])
         card.type_line = data.get("type_line", "")
-        # card_faces[0] oracle_text for MDFCs / adventures
-        if "oracle_text" in data:
-            card.oracle_text = data["oracle_text"]
-        elif "card_faces" in data:
-            card.oracle_text = data["card_faces"][0].get("oracle_text", "")
+        card.oracle_text = data.get("oracle_text") or front.get("oracle_text", "")
         card.keywords = data.get("keywords", [])
         card.cmc = data.get("cmc", 0.0)
+        card.mana_cost = data.get("mana_cost") or front.get("mana_cost", "")
+        card.power = data.get("power") or front.get("power", "")
+        card.toughness = data.get("toughness") or front.get("toughness", "")
+        card.rarity = data.get("rarity", "")
         card.legalities = data.get("legalities", {})
     if missing:
         print(f"  Warning: {missing} card(s) not found in Scryfall data (may be very new prints).")

@@ -15,6 +15,10 @@ class OwnedCard:
     oracle_text: str = ""
     keywords: list = field(default_factory=list)
     cmc: float = 0.0
+    mana_cost: str = ""
+    power: str = ""
+    toughness: str = ""
+    rarity: str = ""
     legalities: dict = field(default_factory=dict)
     is_basic_filler: bool = False  # True when added as basic land padding
 

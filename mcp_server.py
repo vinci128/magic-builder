@@ -9,11 +9,11 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from mcp.server.fastmcp import FastMCP
 
-from collection import parse_collection
-from arena_collection import parse_arena_collection, detect_collection_format
+from arena_collection import load_owned_cards
 from card_data import load_scryfall_lookup, enrich_collection
 from commander import find_commanders
 from deck_builder import build_deck, synergy_score
+from standard_builder import build_standard_deck as _build_standard
 
 mcp = FastMCP("magic-builder")
 
@@ -26,13 +26,8 @@ _cache: dict = {}
 def _get_enriched_collection(collection_path: str) -> list:
     if collection_path in _cache:
         return _cache[collection_path]
-    fmt = detect_collection_format(collection_path)
-    if fmt == "arena":
-        lookup, by_set_cn = load_scryfall_lookup(also_by_set_cn=True)
-        owned = parse_arena_collection(collection_path, by_set_cn)
-    else:
-        owned = parse_collection(collection_path)
-        lookup = load_scryfall_lookup()
+    lookup, by_set_cn = load_scryfall_lookup()
+    owned = load_owned_cards(collection_path, by_set_cn)
     enrich_collection(owned, lookup)
     _cache[collection_path] = owned
     return owned
@@ -135,6 +130,45 @@ def build_commander_deck(commander_name: str, csv_path: str = CSV_PATH) -> str:
         },
     }
     return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def build_standard_deck(csv_path: str = CSV_PATH, colors: str = "") -> str:
+    """Build a 60-card Standard deck using only Standard-legal cards from the collection.
+
+    Picks the strongest mono- or two-color identity (or a forced one), fills up to
+    4 copies per card by rate + synergy under curve constraints, and adds a mana base.
+
+    Args:
+        csv_path: Path to a ManaBox CSV, Arena export, or Arena log-CSV collection file.
+        colors: Optional forced colors, e.g. "W" or "UG". Empty = auto-pick strongest.
+
+    Returns:
+        JSON with chosen colors, the 60-card list (name, count, type, cmc, oracle text),
+        and a curve/role summary.
+    """
+    owned = _get_enriched_collection(csv_path)
+    color_set = set(colors.upper()) if colors.strip() else None
+    deck, used_colors = _build_standard(owned, colors=color_set)
+
+    cards = [
+        {
+            "count": e.count,
+            "name": e.card.name,
+            "type_line": e.card.type_line,
+            "cmc": e.card.cmc,
+            "mana_cost": e.card.mana_cost,
+            "oracle_text": e.card.oracle_text,
+        }
+        for e in deck
+    ]
+    return json.dumps({
+        "colors": sorted(used_colors),
+        "total_cards": sum(e.count for e in deck),
+        "lands": sum(e.count for e in deck if "Land" in e.card.type_line),
+        "creatures": sum(e.count for e in deck if "Creature" in e.card.type_line),
+        "deck": cards,
+    }, indent=2)
 
 
 @mcp.tool()

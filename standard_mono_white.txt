@@ -1,0 +1,45 @@
+════════════════════════════════════════════════════════════
+  MONO-WHITE LIFEGAIN AGGRO — STANDARD (BO1)
+  Built 2026-07-03 from Arena collection (collection_from_logs.csv)
+  All 60 cards owned; every card verified Standard-legal via Scryfall
+════════════════════════════════════════════════════════════
+
+Game plan: flood the board with cheap lifelink/lifegain creatures,
+turn every point of life into stats via Ajani's Pridemate and
+Twinblade Paladin, and clear blockers with premium white removal.
+Helpful Hunter and Inspiring Overseer keep the cards flowing so you
+rarely run out of gas. Curve tops at 5 with Lyra as the finisher.
+
+Creatures (29)
+────────────────────────────────────────
+3 Savannah Lions          — best rate 1-drop in the pool
+3 Leonin Vanguard         — gains 1 life every upkeep (Pridemate trigger)
+2 Healer's Hawk           — evasive lifelink
+2 Hinterland Sanctifier   — every creature you play = +1 life
+3 Ajani's Pridemate       — the payoff; grows every single turn
+4 Helpful Hunter          — 2-drop that replaces itself
+2 Youthful Valkyrie       — grows with each angel (Giada, Overseer, Dazzling, Serra, Lyra)
+1 Giada, Font of Hope     — pumps and ramps the angel package
+2 Inspiring Overseer      — flying + card + life
+2 Dazzling Angel          — second Sanctifier effect, on a 3/3 flier
+2 Twinblade Paladin       — double strike at 25+ life (trivial here)
+1 Serra Angel             — evasive beater
+1 Regal Caracal           — anthem + two lifelink cats (pumps 9 cats in the deck)
+1 Lyra Dawnbringer        — the finisher; first strike lifelink 5/5
+
+Removal (9)
+────────────────────────────────────────
+4 Banishing Light         — answers anything nonland
+3 Stasis Snare            — flash removal for attackers
+2 Valorous Stance         — kills big things or protects Pridemate
+
+Lands (22)
+────────────────────────────────────────
+22 Plains                 — all untapped, all the time
+
+Piloting notes
+────────────────────────────────────────
+- Mulligan hands without a 1- or 2-drop.
+- Sequence lifegain AFTER Pridemate/Twinblade are down when possible.
+- Valorous Stance protects Pridemate from spot removal — hold it up.
+- Giada's counters make even Serra Angel a 5/5+; deploy her early.

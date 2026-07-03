@@ -1,6 +1,5 @@
 Commander
 1 Leonardo, the Balance (TMC) 1
-
 Deck
 1 Acidic Slime (M12) 161
 1 April O'Neil, Live on the Scene (TMC) 9
@@ -70,27 +69,29 @@ Deck
 1 Circuitous Route (FDN) 635
 1 Midnight Clock (ELD) 54
 1 Phyrexian Arena (FDN) 180
-1 Overflowing Insight (ANB) 30
 1 Return of the Wildspeaker (ELD) 172
 1 Chart a Course (FDN) 586
-1 Niv-Mizzet, Visionary (FDN) 123
 1 Eat to Extinction (THB) 90
 1 Soul Shatter (ZNR) 127
-1 Banish into Fable (ELD) 325
 1 Elspeth Conquers Death (THB) 13
-1 Realm-Cloaked Giant (ELD) 26
-1 Rise of the Dark Realms (FDN) 183
-1 Titan of Industry (SNC) 159
 1 Luminous Broodmoth (IKO) 21
 1 Terror of the Peaks (M21) 164
 1 God-Eternal Oketra (WAR) 16
-1 Massacre Wurm (M21) 114
-1 Carnage Tyrant (XLN) 179
-1 Aurelia, the Warleader (FDN) 651
 1 Vizier of the Menagerie (FDN) 649
 1 Kroxa, Titan of Death's Hunger (THB) 221
-1 Hullbreaker Horror (VOW) 63
-1 Etali, Primal Storm (RIX) 100
-1 Kiora Bests the Sea God (THB) 52
 1 Sorin, Vengeful Bloodlord (WAR) 217
 1 Angelic Destiny (FDN) 565
+
+// --- Curve & Synergy Improvements ---
+1 Llanowar Elves (FDN) 227
+1 Opt (FDN) 512
+1 Dragon Fodder (FDN) 535
+1 Anthem of Champions (FDN) 116
+1 Vampiric Rites (FDN) 615
+1 Reassembling Skeleton (FDN) 182
+1 Good-Fortune Unicorn (FDN) 240
+1 Midnight Reaper (FDN) 609
+1 Heroic Reinforcements (FDN) 241
+1 Krenko, Mob Boss (FDN) 204
+1 Spinner of Souls (FDN) 112
+1 Open the Graves (M19) 112
