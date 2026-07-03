@@ -73,6 +73,49 @@ def format_decklist(commander: OwnedCard, deck: list) -> str:
     return "\n".join(lines)
 
 
+def format_standard_deck(deck_entries: list, colors: set, review: str = "") -> str:
+    """Pretty-print a 60-card constructed deck (entries carry a count)."""
+    SEP = "═" * 60
+    DIV = "─" * 40
+    color_str = "".join(c for c in "WUBRG" if c in colors) or "C"
+    lines = [SEP, f"  STANDARD DECK RECOMMENDATION  [{color_str}]", SEP, ""]
+
+    cats = _categorize([e.card for e in deck_entries])
+    by_name = {e.card.name: e for e in deck_entries}
+    total = 0
+    for cat_name, cards in cats.items():
+        if not cards:
+            continue
+        lines.append(f"{cat_name} ({sum(by_name[c.name].count for c in cards)})")
+        lines.append(DIV)
+        for c in sorted(cards, key=_sort_key):
+            e = by_name[c.name]
+            lines.append(f"{e.count} {c.name}")
+            total += e.count
+        lines.append("")
+
+    lines.append(f"Total: {total} cards")
+    if review:
+        lines += ["", SEP, "  AI DECK ANALYSIS (Claude)", SEP, "", review]
+    return "\n".join(lines)
+
+
+def format_standard_decklist(deck_entries: list) -> str:
+    """Arena-importable list: `N Card Name` per line, lands last."""
+    ordered = sorted(deck_entries, key=lambda e: ("Land" in e.card.type_line, e.card.cmc, e.card.name))
+    return "\n".join(f"{e.count} {e.card.name}" for e in ordered)
+
+
+def print_and_save_standard(deck_entries: list, colors: set, review: str, output_path: str):
+    pretty = format_standard_deck(deck_entries, colors, review)
+    print(pretty)
+    Path(output_path).write_text(pretty, encoding="utf-8")
+    import_path = Path(output_path).with_suffix(".decklist.txt")
+    import_path.write_text(format_standard_decklist(deck_entries), encoding="utf-8")
+    print(f"\nSaved to: {output_path}")
+    print(f"Arena import list: {import_path}")
+
+
 def print_and_save(commander: OwnedCard, deck: list, review: str, output_path: str):
     pretty = format_deck(commander, deck, review)
     importable = format_decklist(commander, deck)
