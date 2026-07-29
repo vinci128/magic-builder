@@ -1,5 +1,7 @@
 # Magic Deck Builder
 
+[![ko-fi](https://img.shields.io/badge/support-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/vinci128)
+
 Builds a 100-card Commander deck or a 60-card Standard deck from your collection using Scryfall card data, heuristic role-filling, and an optional Claude AI review pass. Also exposes its core functions as MCP server tools so Claude can call them directly and iterate on decks conversationally.
 
 ## Features
