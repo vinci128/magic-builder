@@ -89,9 +89,11 @@ Collections live in memory only — nothing is written to disk, and the 20 most 
 
 ## Deployment
 
-`render.yaml` deploys the web UI to [Render](https://render.com) as a free-tier
-web service. In the Render dashboard: **New → Blueprint**, point it at this
-repo, and it reads the file.
+The web UI runs at **https://magic-builder.onrender.com**.
+
+`render.yaml` deploys it to [Render](https://render.com) as a free-tier web
+service. In the Render dashboard: **New → Blueprint**, point it at this repo,
+and it reads the file.
 
 ```yaml
 buildCommand: pip install -r requirements.txt
@@ -109,6 +111,10 @@ Two things to know about the free tier:
   not fit), leaving room for uvicorn and a handful of uploaded collections.
 * **Sleeps after 15 minutes idle.** The first request after a sleep waits
   ~1–2 minutes for the instance and the card database to come back up.
+
+No `healthCheckPath` is configured, deliberately: with one set, Render's router
+dropped the instance for roughly half of all requests
+(`x-render-routing: no-server`) while the process itself stayed up.
 
 ## MCP Server
 
