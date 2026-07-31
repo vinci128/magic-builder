@@ -350,7 +350,8 @@ def _rec_json(rec) -> dict:
     """Serialize a Recommendation; fill card details from the collection or Scryfall."""
     card = rec.owned
     data = _scryfall_by_name().get(_edhrec_name_key(rec.name)) if card is None else None
-    images = (data or {}).get("image_uris") or {}
+    # CardView stores image_uris as the "normal" URL string, not a dict.
+    image_url = data.get("image_uris", "") if data is not None else ""
     return {
         "name": rec.name,
         "category": rec.category,
@@ -358,9 +359,9 @@ def _rec_json(rec) -> dict:
         "inclusion": round(rec.inclusion, 3),
         "num_decks": rec.num_decks,
         "owned": card is not None,
-        "type_line": card.type_line if card else (data or {}).get("type_line", ""),
-        "mana_cost": card.mana_cost if card else (data or {}).get("mana_cost", ""),
-        "image_url": card.image_url if card else images.get("normal", ""),
+        "type_line": card.type_line if card else (data.get("type_line", "") if data else ""),
+        "mana_cost": card.mana_cost if card else (data.get("mana_cost", "") if data else ""),
+        "image_url": card.image_url if card else image_url,
     }
 
 

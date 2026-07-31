@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: magic-builder
+    runtime: python
+    plan: free
+    branch: feat/web-ui-edhrec
+    # The Scryfall bulk file is fetched at build time so it ships with the
+    # instance: a cold start after the free tier's idle sleep then skips the
+    # ~80 MB download and only pays for loading the cards into memory.
+    buildCommand: |
+      pip install -r requirements.txt
+      python -c "from card_data import _download_bulk_data; _download_bulk_data()"
+    startCommand: uvicorn web_app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.9"
