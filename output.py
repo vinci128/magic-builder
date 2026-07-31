@@ -31,7 +31,43 @@ def _sort_key(card: OwnedCard):
     return (card.cmc, card.name)
 
 
-def format_deck(commander: OwnedCard, deck: list, review: str = "") -> str:
+def format_recommendations(recs: dict) -> str:
+    """Render the EDHREC upgrade / acquisition split as a text section."""
+    SEP = "═" * 60
+    DIV = "─" * 40
+    lines = [SEP, "  EDHREC RECOMMENDATIONS", SEP, ""]
+
+    if recs.get("error"):
+        return "\n".join(lines + [recs["error"]])
+
+    lines.append(
+        f"{recs['in_deck']} of EDHREC's {recs['total']} recommended cards are already in this deck."
+    )
+    lines.append("")
+
+    upgrades = recs.get("upgrades") or []
+    lines.append(f"Own it, not in the deck ({len(upgrades)})")
+    lines.append(DIV)
+    if upgrades:
+        for r in upgrades:
+            lines.append(f"{r.name:<34} {r.inclusion:>4.0%} of decks   synergy {r.synergy:+.2f}")
+    else:
+        lines.append("Nothing — the builder already used every recommended card you own.")
+    lines.append("")
+
+    acquire = recs.get("acquire") or []
+    lines.append(f"Worth acquiring ({len(acquire)})")
+    lines.append(DIV)
+    for r in acquire:
+        lines.append(f"{r.name:<34} {r.inclusion:>4.0%} of decks   synergy {r.synergy:+.2f}")
+
+    lines.append("")
+    lines.append("Inclusion = share of this commander's EDHREC decks running the card.")
+    lines.append("Synergy = how much more often it appears here than in decks generally.")
+    return "\n".join(lines)
+
+
+def format_deck(commander: OwnedCard, deck: list, recs: dict | None = None) -> str:
     SEP = "═" * 60
     DIV = "─" * 40
     lines = [SEP, "  COMMANDER DECK RECOMMENDATION", SEP, ""]
@@ -59,8 +95,8 @@ def format_deck(commander: OwnedCard, deck: list, review: str = "") -> str:
     if fillers_count:
         lines.append(f"Note: {fillers_count} basic land(s) added as filler — not from your collection.")
 
-    if review:
-        lines += ["", SEP, "  AI DECK ANALYSIS (Claude)", SEP, "", review]
+    if recs:
+        lines += ["", format_recommendations(recs)]
 
     return "\n".join(lines)
 
@@ -73,7 +109,7 @@ def format_decklist(commander: OwnedCard, deck: list) -> str:
     return "\n".join(lines)
 
 
-def format_standard_deck(deck_entries: list, colors: set, review: str = "") -> str:
+def format_standard_deck(deck_entries: list, colors: set) -> str:
     """Pretty-print a 60-card constructed deck (entries carry a count)."""
     SEP = "═" * 60
     DIV = "─" * 40
@@ -95,8 +131,6 @@ def format_standard_deck(deck_entries: list, colors: set, review: str = "") -> s
         lines.append("")
 
     lines.append(f"Total: {total} cards")
-    if review:
-        lines += ["", SEP, "  AI DECK ANALYSIS (Claude)", SEP, "", review]
     return "\n".join(lines)
 
 
@@ -106,8 +140,8 @@ def format_standard_decklist(deck_entries: list) -> str:
     return "\n".join(f"{e.count} {e.card.name}" for e in ordered)
 
 
-def print_and_save_standard(deck_entries: list, colors: set, review: str, output_path: str):
-    pretty = format_standard_deck(deck_entries, colors, review)
+def print_and_save_standard(deck_entries: list, colors: set, output_path: str):
+    pretty = format_standard_deck(deck_entries, colors)
     print(pretty)
     Path(output_path).write_text(pretty, encoding="utf-8")
     import_path = Path(output_path).with_suffix(".decklist.txt")
@@ -116,8 +150,9 @@ def print_and_save_standard(deck_entries: list, colors: set, review: str, output
     print(f"Arena import list: {import_path}")
 
 
-def print_and_save(commander: OwnedCard, deck: list, review: str, output_path: str):
-    pretty = format_deck(commander, deck, review)
+def print_and_save(commander: OwnedCard, deck: list, output_path: str,
+                   recs: dict | None = None):
+    pretty = format_deck(commander, deck, recs)
     importable = format_decklist(commander, deck)
 
     print(pretty)

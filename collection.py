@@ -20,6 +20,7 @@ class OwnedCard:
     toughness: str = ""
     rarity: str = ""
     legalities: dict = field(default_factory=dict)
+    image_url: str = ""
     is_basic_filler: bool = False  # True when added as basic land padding
 
 

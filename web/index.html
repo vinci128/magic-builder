@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Magic Deck Builder</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='2' fill='%230d1014'/%3E%3Cpath d='M4 3h3l1 4 1-4h3v10H9V7l-1 4H7L6 7v6H4z' fill='%23c6a15b'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-mark">
+    <span class="pip pip-W"></span><span class="pip pip-U"></span><span class="pip pip-B"></span><span class="pip pip-R"></span><span class="pip pip-G"></span>
+  </div>
+  <h1 class="masthead-title">Deck Builder</h1>
+  <p class="masthead-sub">Your collection in. A legal deck out.</p>
+  <div class="masthead-status" id="db-status" data-state="loading">
+    <span class="dot"></span><span id="db-status-text">Loading card database…</span>
+  </div>
+</header>
+
+<main class="frame">
+
+  <!-- ── Left rail: intake and controls ───────────────────────────────── -->
+  <aside class="rail">
+    <section class="panel" id="intake-panel">
+      <h2 class="panel-title">1 · Collection</h2>
+
+      <label class="drop" id="drop" for="file-input" tabindex="0">
+        <input type="file" id="file-input" accept=".csv,.txt" hidden>
+        <span class="drop-line">Drop your collection file</span>
+        <span class="drop-sub">or click to browse</span>
+        <span class="drop-formats">ManaBox CSV · Arena list · Arena log CSV</span>
+      </label>
+
+      <div class="notice" id="upload-error" hidden></div>
+
+      <div class="stats" id="stats" hidden>
+        <div class="stat-file"><span id="stat-filename"></span><span class="tag" id="stat-format"></span></div>
+        <dl class="stat-grid">
+          <div><dt>Unique cards</dt><dd id="stat-unique">—</dd></div>
+          <div><dt>Total copies</dt><dd id="stat-total">—</dd></div>
+          <div><dt>Commander legal</dt><dd id="stat-cmd">—</dd></div>
+          <div><dt>Standard legal</dt><dd id="stat-std">—</dd></div>
+        </dl>
+        <div class="pip-meter" id="collection-colors" aria-label="Colour makeup of the collection"></div>
+      </div>
+    </section>
+
+    <section class="panel" id="build-panel" hidden>
+      <h2 class="panel-title">2 · Format</h2>
+
+      <div class="tabs" role="tablist">
+        <button class="tab is-on" role="tab" aria-selected="true" data-format="commander">Commander</button>
+        <button class="tab" role="tab" aria-selected="false" data-format="standard">Standard</button>
+      </div>
+
+      <div class="tabpane" id="pane-commander">
+        <p class="pane-note">Ranked by how much of your collection fits each commander's colour identity.</p>
+        <label class="check">
+          <input type="checkbox" id="opt-edhrec">
+          <span>Weight by EDHREC popularity <em>(slower — one lookup per candidate)</em></span>
+        </label>
+        <div class="cmd-list" id="commander-list"></div>
+      </div>
+
+      <div class="tabpane" id="pane-standard" hidden>
+        <p class="pane-note">Leave every colour off to let the builder pick the strongest identity in your pool.</p>
+        <div class="color-picker" id="color-picker">
+          <button class="color-btn" data-color="W" aria-pressed="false"><span class="pip pip-W"></span>White</button>
+          <button class="color-btn" data-color="U" aria-pressed="false"><span class="pip pip-U"></span>Blue</button>
+          <button class="color-btn" data-color="B" aria-pressed="false"><span class="pip pip-B"></span>Black</button>
+          <button class="color-btn" data-color="R" aria-pressed="false"><span class="pip pip-R"></span>Red</button>
+          <button class="color-btn" data-color="G" aria-pressed="false"><span class="pip pip-G"></span>Green</button>
+        </div>
+      </div>
+
+      <button class="build" id="build-btn">Build deck</button>
+      <div class="notice" id="build-error" hidden></div>
+    </section>
+  </aside>
+
+  <!-- ── Right: the deck ──────────────────────────────────────────────── -->
+  <section class="stage" id="stage">
+
+    <div class="empty" id="empty">
+      <p class="empty-kicker">No deck yet</p>
+      <h2 class="empty-head">Every deck in here<br>is one you already own.</h2>
+      <ol class="empty-steps">
+        <li><span>Export</span> your collection from ManaBox or scrape it from Arena.</li>
+        <li><span>Drop</span> the file in the panel on the left.</li>
+        <li><span>Build</span> a 100-card Commander deck or a 60-card Standard list.</li>
+      </ol>
+    </div>
+
+    <div class="working" id="working" hidden>
+      <div class="working-bar"><i></i></div>
+      <p id="working-text">Building…</p>
+    </div>
+
+    <article class="deck" id="deck" hidden>
+      <div class="plate">
+        <div class="plate-rows">
+          <p class="plate-kicker" id="deck-kicker">Commander</p>
+          <h2 class="plate-name" id="deck-name"></h2>
+          <p class="plate-type" id="deck-type"></p>
+        </div>
+        <div class="plate-pips" id="deck-identity"></div>
+      </div>
+
+      <div class="readout">
+        <div class="figure">
+          <div class="figure-head">
+            <h3>Mana curve</h3>
+            <p class="figure-note"><span id="deck-count">—</span> cards · <span id="deck-avg">—</span> average mana value · <span id="deck-lands">—</span> lands</p>
+          </div>
+          <div class="curve" id="curve" role="img" aria-label="Cards by mana value"></div>
+        </div>
+        <div class="figure">
+          <div class="figure-head">
+            <h3>Coloured pips</h3>
+            <p class="figure-note">What the mana base has to produce</p>
+          </div>
+          <div class="pip-meter" id="deck-pips"></div>
+        </div>
+      </div>
+
+      <div class="deck-actions">
+        <button class="ghost" id="copy-list">Copy deck list</button>
+        <button class="ghost" id="download-list">Download .txt</button>
+        <button class="ghost" id="toggle-text">Show plain text</button>
+      </div>
+
+      <div class="columns" id="columns"></div>
+
+      <pre class="plain" id="plain" hidden></pre>
+
+      <section class="recs" id="recs" hidden>
+        <div class="recs-head">
+          <h3>What other players run</h3>
+          <p class="figure-note" id="recs-note">Reading EDHREC…</p>
+        </div>
+        <div class="recs-grid" id="recs-grid"></div>
+      </section>
+    </article>
+  </section>
+</main>
+
+<div class="preview" id="preview" hidden><img id="preview-img" alt=""></div>
+
+<script src="/app.js"></script>
+</body>
+</html>

@@ -1,3 +1,4 @@
+import gzip
 import json
 import time
 from pathlib import Path
@@ -5,8 +6,16 @@ from pathlib import Path
 import requests
 
 CACHE_DIR = Path(".cache")
-CACHE_FILE = CACHE_DIR / "scryfall_default_cards.json"
+CACHE_FILE = CACHE_DIR / "scryfall_default_cards.jsonl.gz"
 CACHE_TTL = 7 * 86400  # 7 days — bulk data barely changes between set releases
+
+# Only the fields the builders read — keeping the raw objects costs several GB.
+_KEEP = (
+    "id", "name", "set", "set_name", "collector_number", "color_identity",
+    "type_line", "oracle_text", "keywords", "cmc", "mana_cost", "power",
+    "toughness", "rarity", "legalities",
+)
+_FACE_KEEP = ("oracle_text", "mana_cost", "power", "toughness")
 
 
 def _is_cache_fresh() -> bool:
@@ -27,21 +36,60 @@ def _download_bulk_data():
         timeout=15,
     )
     resp.raise_for_status()
-    download_uri = resp.json()["download_uri"]
+    index = resp.json()
+    # Scryfall serves gzipped JSONL now; older responses carried a plain JSON array.
+    download_uri = index.get("jsonl_download_uri") or index.get("download_uri")
+    if not download_uri:
+        raise RuntimeError("Scryfall bulk-data index has no download URI")
 
-    print("Downloading card database (~250 MB, cached for 24 h)...")
-    with requests.get(download_uri, stream=True, timeout=120) as r:
+    print("Downloading card database (~80 MB compressed, cached for 7 days)...")
+    tmp_path = CACHE_FILE.with_suffix(".part")
+    with requests.get(download_uri, stream=True, timeout=300) as r:
         r.raise_for_status()
         total = int(r.headers.get("content-length", 0))
         downloaded = 0
-        with open(CACHE_FILE, "wb") as f:
-            for chunk in r.iter_content(chunk_size=65536):
+        with open(tmp_path, "wb") as f:
+            for chunk in r.iter_content(chunk_size=1 << 20):
                 f.write(chunk)
                 downloaded += len(chunk)
                 if total:
                     pct = downloaded * 100 // total
                     print(f"\r  {pct}% ({downloaded // 1_000_000} MB)", end="", flush=True)
+    tmp_path.replace(CACHE_FILE)
     print("\nDownload complete.")
+
+
+def _slim(card: dict) -> dict:
+    """Drop the ~40 fields nothing in this project reads."""
+    out = {k: card[k] for k in _KEEP if k in card}
+    images = card.get("image_uris")
+    if images:
+        out["image_uris"] = {"normal": images.get("normal") or images.get("small", "")}
+    faces = card.get("card_faces")
+    if faces:
+        front = faces[0]
+        face = {k: front[k] for k in _FACE_KEEP if k in front}
+        face_images = front.get("image_uris")
+        if face_images:
+            face["image_uris"] = {"normal": face_images.get("normal") or face_images.get("small", "")}
+        out["card_faces"] = [face]
+    return out
+
+
+def _iter_cards():
+    """Yield slimmed card dicts from the cached bulk file (JSONL, or legacy JSON array)."""
+    opener = gzip.open if CACHE_FILE.suffix == ".gz" else open
+    with opener(CACHE_FILE, "rt", encoding="utf-8") as f:
+        first = f.read(1)
+        f.seek(0)
+        if first == "[":  # legacy single-array dump
+            for card in json.load(f):
+                yield _slim(card)
+            return
+        for line in f:
+            line = line.strip().rstrip(",")
+            if line and line not in ("[", "]"):
+                yield _slim(json.loads(line))
 
 
 _scryfall_cache: tuple | None = None
@@ -54,10 +102,12 @@ def load_scryfall_lookup() -> tuple[dict, dict]:
         return _scryfall_cache
     _download_bulk_data()
     print("Loading card database into memory...")
-    with open(CACHE_FILE, encoding="utf-8") as f:
-        cards = json.load(f)
-    by_id = {c["id"]: c for c in cards}
-    by_set_cn = {(c["set"].lower(), c["collector_number"].lower()): c for c in cards}
+    by_id: dict = {}
+    by_set_cn: dict = {}
+    for card in _iter_cards():
+        by_id[card["id"]] = card
+        by_set_cn[(card["set"].lower(), card["collector_number"].lower())] = card
+    print(f"Loaded {len(by_id):,} cards.")
     _scryfall_cache = (by_id, by_set_cn)
     return _scryfall_cache
 
@@ -81,5 +131,7 @@ def enrich_collection(owned_cards: list, scryfall_lookup: dict):
         card.toughness = data.get("toughness") or front.get("toughness", "")
         card.rarity = data.get("rarity", "")
         card.legalities = data.get("legalities", {})
+        images = data.get("image_uris") or front.get("image_uris") or {}
+        card.image_url = images.get("normal") or images.get("small", "")
     if missing:
         print(f"  Warning: {missing} card(s) not found in Scryfall data (may be very new prints).")

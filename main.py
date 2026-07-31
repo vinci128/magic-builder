@@ -1,23 +1,21 @@
 import sys
 
 import click
-from dotenv import load_dotenv
-
-load_dotenv()
 
 from arena_collection import load_owned_cards
 from card_data import load_scryfall_lookup, enrich_collection
 from commander import find_commanders
 from deck_builder import build_deck
+from edhrec_recs import recommend
 from standard_builder import build_standard_deck
-from ai_advisor import get_deck_review, get_standard_review
 from output import print_and_save, print_and_save_standard
 
 
 @click.command()
 @click.argument("collection_path", default="ManaBox_Collection.csv")
 @click.option("--output", "-o", default="deck_output.txt", show_default=True, help="Output file path.")
-@click.option("--no-ai", is_flag=True, help="Skip Claude AI review (no ANTHROPIC_API_KEY needed).")
+@click.option("--no-recs", "--no-ai", "no_recs", is_flag=True,
+              help="Skip the EDHREC recommendation pass (works offline).")
 @click.option(
     "--format", "fmt",
     type=click.Choice(["commander", "standard"]),
@@ -38,7 +36,7 @@ from output import print_and_save, print_and_save_standard
     metavar="N",
     help="Use the Nth-best scoring commander instead of the top one (commander format only).",
 )
-def main(collection_path: str, output: str, no_ai: bool, fmt: str, colors: str | None, pick: int):
+def main(collection_path: str, output: str, no_recs: bool, fmt: str, colors: str | None, pick: int):
     """Build a Commander or Standard deck from your collection.
 
     Accepts a ManaBox CSV export, an MTG Arena deck export
@@ -62,12 +60,8 @@ def main(collection_path: str, output: str, no_ai: bool, fmt: str, colors: str |
         total = sum(e.count for e in deck_entries)
         assert total == 60, f"Expected 60 cards, got {total}"
 
-        review = ""
-        if not no_ai:
-            print("Requesting AI deck review from Claude...")
-            review = get_standard_review(deck_entries, used_colors)
         print()
-        print_and_save_standard(deck_entries, used_colors, review, output)
+        print_and_save_standard(deck_entries, used_colors, output)
         return
 
     # ── 3. Find commander candidates ──────────────────────────────────────
@@ -97,15 +91,15 @@ def main(collection_path: str, output: str, no_ai: bool, fmt: str, colors: str |
     if violations:
         click.echo(f"Warning: {len(violations)} card(s) violate color identity — please report this bug.", err=True)
 
-    # ── 5. Claude review ───────────────────────────────────────────────────
-    review = ""
-    if not no_ai:
-        print("Requesting AI deck review from Claude...")
-        review = get_deck_review(commander, deck)
+    # ── 5. EDHREC recommendations ─────────────────────────────────────────
+    recs = None
+    if not no_recs:
+        print("Fetching EDHREC recommendations...")
+        recs = recommend(commander, owned, deck)
 
     # ── 6. Output ──────────────────────────────────────────────────────────
     print()
-    print_and_save(commander, deck, review, output)
+    print_and_save(commander, deck, output, recs)
 
 
 if __name__ == "__main__":

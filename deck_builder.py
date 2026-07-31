@@ -210,7 +210,7 @@ def build_deck(commander: OwnedCard, owned_cards: list) -> list:
     # and NOT basic lands (those are added automatically)
     pool = [
         c for c in owned_cards
-        if c.scryfall_id != commander.scryfall_id
+        if c.name != commander.name
         and set(c.color_identity).issubset(ci)
         and c.legalities.get("commander") == "legal"
         and not _is_basic_land(c)
@@ -222,14 +222,16 @@ def build_deck(commander: OwnedCard, owned_cards: list) -> list:
     scored_non_lands  = sorted(non_lands,       key=lambda c: synergy_score(c, commander), reverse=True)
     scored_lands      = sorted(non_basic_lands, key=lambda c: synergy_score(c, commander), reverse=True)
 
-    used_ids: set[str] = set()
+    # Commander is singleton: a second printing of a card is still a duplicate,
+    # so reserve by name rather than by Scryfall id.
+    used_names: set[str] = set()
 
     def pick(source: list, target: int) -> list:
         chosen = []
         for c in source:
-            if c.scryfall_id not in used_ids:
+            if c.name not in used_names:
                 chosen.append(c)
-                used_ids.add(c.scryfall_id)
+                used_names.add(c.name)
                 if len(chosen) == target:
                     break
         return chosen

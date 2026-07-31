@@ -26,7 +26,7 @@ def _edhrec_popularity(name: str) -> float:
         return 0.0
 
 
-def score_commander(candidate: OwnedCard, all_cards: list) -> float:
+def score_commander(candidate: OwnedCard, all_cards: list, use_popularity: bool = True) -> float:
     ci = set(candidate.color_identity)
     compatible = sum(
         1 for c in all_cards
@@ -34,13 +34,17 @@ def score_commander(candidate: OwnedCard, all_cards: list) -> float:
         and set(c.color_identity).issubset(ci)
         and c.legalities.get("commander") == "legal"
     )
-    popularity = _edhrec_popularity(candidate.name)
+    popularity = _edhrec_popularity(candidate.name) if use_popularity else 0.0
     return compatible + popularity
 
 
-def find_commanders(owned_cards: list) -> list:
-    """Return list of (OwnedCard, score) sorted best-first."""
+def find_commanders(owned_cards: list, use_popularity: bool = True) -> list:
+    """Return list of (OwnedCard, score) sorted best-first.
+
+    `use_popularity` adds an EDHREC deck-count bonus — one network call per
+    candidate, so callers that need a fast answer can turn it off.
+    """
     candidates = [c for c in owned_cards if is_commander_eligible(c)]
-    scored = [(c, score_commander(c, owned_cards)) for c in candidates]
+    scored = [(c, score_commander(c, owned_cards, use_popularity)) for c in candidates]
     scored.sort(key=lambda x: x[1], reverse=True)
     return scored
