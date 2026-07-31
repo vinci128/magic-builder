@@ -3,6 +3,7 @@ services:
     name: magic-builder
     runtime: python
     plan: free
+    repo: https://github.com/vinci128/magic-builder
     branch: feat/web-ui-edhrec
     # The Scryfall bulk file is fetched at build time so it ships with the
     # instance: a cold start after the free tier's idle sleep then skips the

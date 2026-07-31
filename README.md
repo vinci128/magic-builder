@@ -87,6 +87,29 @@ The Scryfall database loads once in the background at startup — the header sho
 
 Collections live in memory only — nothing is written to disk, and the 20 most recent uploads are kept.
 
+## Deployment
+
+`render.yaml` deploys the web UI to [Render](https://render.com) as a free-tier
+web service. In the Render dashboard: **New → Blueprint**, point it at this
+repo, and it reads the file.
+
+```yaml
+buildCommand: pip install -r requirements.txt
+              python -c "from card_data import _download_bulk_data; _download_bulk_data()"
+startCommand: uvicorn web_app:app --host 0.0.0.0 --port $PORT
+```
+
+The bulk card file is downloaded during the build rather than on first request,
+so a cold start only pays for loading the cards, not the 80 MB download.
+
+Two things to know about the free tier:
+
+* **512 MB memory.** Loading all 116k cards costs about 116 MB (see the
+  `CardView` note in `card_data.py` — as plain dicts it was 644 MB and would
+  not fit), leaving room for uvicorn and a handful of uploaded collections.
+* **Sleeps after 15 minutes idle.** The first request after a sleep waits
+  ~1–2 minutes for the instance and the card database to come back up.
+
 ## MCP Server
 
 The builder exposes four tools via [FastMCP](https://github.com/jlowin/fastmcp) that Claude can call directly in a conversation:
