@@ -106,9 +106,12 @@ SYNERGY_THEME_LABELS = {
     "angels": "Angel payoff with no Angels",
 }
 
-# Fires on most of the curve, so it says nothing about a deck's theme — the
-# mana curve chart already covers it. Still shown per card, where it is true.
-GENERIC_SYNERGY_THEMES = {"cheap"}
+# Terms that fire on most of the deck and so say nothing about its theme:
+# `cheap` is really a curve statement (the mana curve chart already shows it),
+# and `text` trips on any shared five-letter word, which is a weak enough
+# signal that it drowns out tribal and keyword overlap. Both still score, and
+# both still appear per card where they are true — they just don't headline.
+GENERIC_SYNERGY_THEMES = {"cheap", "text"}
 
 
 def _creature_types(type_line: str) -> set:
