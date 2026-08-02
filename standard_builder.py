@@ -183,6 +183,22 @@ _TAG_PAIRS = {
 }
 
 
+# Player-facing names for the tags above, for the web UI's synergy panel.
+TAG_LABELS = {
+    "lifegain_source": "Life gain",
+    "lifegain_payoff": "Life-gain payoffs",
+    "token_source": "Token makers",
+    "token_payoff": "Team pumps",
+    "counters": "+1/+1 counters",
+    "mana_dork": "Mana ramp",
+}
+
+
+def synergy_tags(card: OwnedCard) -> set:
+    """Public view of the tags the builder scores on."""
+    return _tags(card)
+
+
 def synergy_boost(card: OwnedCard, pool: list[DeckEntry]) -> float:
     tags = _tags(card)
     if not tags:

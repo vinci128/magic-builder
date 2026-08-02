@@ -257,6 +257,7 @@ function renderDeck(deck) {
 
   renderCurve(deck.curve);
   renderPipMeter($("deck-pips"), deck.pips);
+  renderSynergy(deck.synergy);
   renderColumns(deck.categories);
 
   $("plain").textContent = deck.pretty;
@@ -352,6 +353,68 @@ function renderCurve(curve) {
   });
 }
 
+// ── Synergy ─────────────────────────────────────────────────────────────────
+
+function renderSynergy(syn) {
+  const section = $("synergy");
+  if (!syn || (!syn.themes.length && !syn.top.length)) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+
+  $("synergy-title").textContent =
+    syn.kind === "commander" ? "Why these cards" : "What this deck is doing";
+  $("synergy-headline").textContent = syn.headline;
+
+  // Bars are relative to the most common theme, so the shape reads at a glance.
+  const themes = $("synergy-themes");
+  themes.replaceChildren();
+  const peak = Math.max(...syn.themes.map((t) => t.count), 1);
+  syn.themes.forEach((theme) => {
+    const item = document.createElement("div");
+    item.className = "syn-theme";
+    item.innerHTML = `<span class="syn-theme-name"></span>
+      <span class="syn-bar"><i style="width:${Math.round((theme.count / peak) * 100)}%"></i></span>
+      <span class="syn-theme-count">${theme.count}</span>`;
+    item.querySelector(".syn-theme-name").textContent = theme.label;
+    themes.append(item);
+  });
+
+  const top = $("synergy-top");
+  top.replaceChildren();
+  syn.top.forEach((card) => {
+    const li = document.createElement("li");
+    li.className = "syn-card";
+    li.innerHTML = `<span class="syn-card-name"></span>
+      <span class="syn-card-why"></span>
+      <span class="syn-card-score">${card.score.toFixed(1)}</span>`;
+    li.querySelector(".syn-card-name").textContent = card.name;
+    li.querySelector(".syn-card-why").textContent = card.why.join(" · ");
+    top.append(li);
+  });
+
+  const drags = $("synergy-drags");
+  if (syn.drags && syn.drags.length) {
+    drags.hidden = false;
+    drags.replaceChildren();
+    const head = document.createElement("p");
+    head.className = "syn-drags-head";
+    head.textContent = "Scored against, kept only because the slot had to be filled:";
+    drags.append(head);
+    syn.drags.forEach((drag) => {
+      const line = document.createElement("p");
+      line.className = "syn-drag";
+      line.innerHTML = `<span class="syn-drag-name"></span><span class="syn-drag-why"></span>`;
+      line.querySelector(".syn-drag-name").textContent = drag.name;
+      line.querySelector(".syn-drag-why").textContent = drag.label;
+      drags.append(line);
+    });
+  } else {
+    drags.hidden = true;
+  }
+}
+
 function renderColumns(categories) {
   const el = $("columns");
   el.replaceChildren();
@@ -368,13 +431,25 @@ function renderColumns(categories) {
     cat.cards.forEach((card) => {
       const row = document.createElement("div");
       row.className = "row" + (card.is_filler ? " is-filler" : "");
+      // Only Commander decks carry per-card synergy; Standard rows keep 3 columns.
+      const hasSynergy = typeof card.synergy === "number";
+      if (hasSynergy) row.classList.add("with-syn");
       row.innerHTML = `<span class="row-count">${card.count > 1 ? card.count + "×" : ""}</span>
         <span class="row-name"></span>
+        ${hasSynergy ? '<span class="row-syn"></span>' : ""}
         <span class="row-cmc">${card.mana_cost || ""}</span>`;
       row.querySelector(".row-name").textContent = card.name;
+      if (hasSynergy) {
+        const syn = row.querySelector(".row-syn");
+        syn.textContent = card.synergy ? card.synergy.toFixed(1) : "";
+        if (card.synergy < 0) syn.classList.add("is-drag");
+      }
+      const why = (card.synergy_why || []).join(" · ");
       row.title = card.is_filler
         ? `${card.type_line} — added as filler, not from your collection`
-        : card.type_line;
+        : why
+          ? `${card.type_line}\nSynergy ${card.synergy.toFixed(1)} — ${why}`
+          : card.type_line;
       attachPreview(row, card.image_url);
       box.append(row);
     });

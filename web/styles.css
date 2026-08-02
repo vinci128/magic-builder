@@ -560,6 +560,76 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: default; }
 .row-cmc { font-family: var(--data); font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .row.is-filler .row-name { color: var(--ink-3); font-style: italic; }
+.row.with-syn { grid-template-columns: 22px minmax(0, 1fr) auto auto; }
+.row-syn {
+  font-family: var(--data);
+  font-size: 10.5px;
+  color: var(--brass-dim);
+  font-variant-numeric: tabular-nums;
+}
+.row-syn.is-drag { color: var(--alert); }
+
+/* ── Synergy panel ────────────────────────────────────────────────────── */
+
+.synergy {
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 18px;
+  margin-bottom: var(--gap);
+}
+
+.syn-themes { display: grid; gap: 6px; margin-top: 14px; }
+
+.syn-theme {
+  display: grid;
+  grid-template-columns: minmax(0, 200px) minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+}
+.syn-theme-name { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.syn-theme-count {
+  font-family: var(--data);
+  font-size: 11px;
+  color: var(--ink-3);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.syn-bar { display: block; height: 6px; background: var(--raised); border-radius: 2px; overflow: hidden; }
+.syn-bar i { display: block; height: 100%; background: var(--brass-dim); }
+
+.syn-top { list-style: none; margin: 18px 0 0; padding: 0; }
+.syn-card {
+  display: grid;
+  grid-template-columns: minmax(0, 200px) minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 0;
+  font-size: 13px;
+}
+.syn-card + .syn-card { border-top: 1px solid rgba(41, 49, 60, 0.4); }
+.syn-card-name { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.syn-card-why { color: var(--ink-3); font-size: 11.5px; }
+.syn-card-score {
+  font-family: var(--data);
+  font-size: 11.5px;
+  color: var(--brass);
+  font-variant-numeric: tabular-nums;
+}
+
+.syn-drags { margin-top: 16px; border-top: 1px solid var(--rule-soft); padding-top: 12px; }
+.syn-drags-head { font-size: 11.5px; color: var(--ink-3); margin: 0 0 6px; }
+.syn-drag {
+  display: grid;
+  grid-template-columns: minmax(0, 200px) minmax(0, 1fr);
+  gap: 10px;
+  margin: 0;
+  padding: 3px 0;
+  font-size: 12.5px;
+}
+.syn-drag-name { color: var(--ink-2); }
+.syn-drag-why { color: var(--alert); font-size: 11.5px; }
 
 /* ── Plain text + review ──────────────────────────────────────────────── */
 
@@ -693,6 +763,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   .readout { grid-template-columns: 1fr; }
   .masthead-status { position: static; margin-top: 14px; }
   .preview { display: none; }
+  .syn-theme, .syn-card, .syn-drag { grid-template-columns: minmax(0, 1fr) auto; }
+  .syn-theme .syn-bar, .syn-card-why, .syn-drag-why { grid-column: 1 / -1; }
 }
 
 @media (prefers-reduced-motion: reduce) {

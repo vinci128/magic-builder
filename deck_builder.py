@@ -1,3 +1,5 @@
+from typing import NamedTuple
+
 from collection import OwnedCard
 
 # Target slot counts for non-land cards
@@ -77,6 +79,38 @@ def _is_removal(card: OwnedCard) -> bool:
 
 # ── Synergy scoring ──────────────────────────────────────────────────────────
 
+class SynergyReason(NamedTuple):
+    """One scoring term. `key` groups the same reason across cards."""
+
+    key: str
+    label: str
+    points: float
+
+
+# Generic names for each `key`, for summarising a whole deck. The per-card
+# labels carry specifics (which keywords, which tribe) that don't generalise.
+SYNERGY_THEME_LABELS = {
+    "keywords": "Shared keywords",
+    "text": "Echoes the commander's rules text",
+    "tribal": "Tribal overlap",
+    "cheap": "Cheap enough to redeploy",
+    "etb": "Enters-the-battlefield value",
+    "flash": "Flash",
+    "landfetch": "Land fetch",
+    "bounce": "Bounce to replay entry triggers",
+    "landfall": "Landfall",
+    "ripple": "Ripple — dead in singleton",
+    "selfmill": "Self-mill for colourless mana",
+    "gifts": "Gives opponents tokens",
+    "equipment": "Equipment payoff with no Equipment",
+    "angels": "Angel payoff with no Angels",
+}
+
+# Fires on most of the curve, so it says nothing about a deck's theme — the
+# mana curve chart already covers it. Still shown per card, where it is true.
+GENERIC_SYNERGY_THEMES = {"cheap"}
+
+
 def _creature_types(type_line: str) -> set:
     if "Creature" not in type_line:
         return set()
@@ -84,25 +118,42 @@ def _creature_types(type_line: str) -> set:
     return set(parts[1].strip().split()) if len(parts) > 1 else set()
 
 
-def synergy_score(card: OwnedCard, commander: OwnedCard) -> float:
-    score = 0.0
+def synergy_reasons(card: OwnedCard, commander: OwnedCard) -> list["SynergyReason"]:
+    """Every scoring term that fired for this card.
+
+    `synergy_score` is the sum of these, so the two can never drift apart — and
+    the web UI can show a player *why* a card made the deck.
+    """
+    reasons: list[SynergyReason] = []
     cmd_kw = {k.lower() for k in commander.keywords}
     card_kw = {k.lower() for k in card.keywords}
 
     # Keyword overlap with reduced weight — generic keywords (e.g. Vigilance) are noise
-    score += len(cmd_kw & card_kw) * 1.0
+    shared_kw = cmd_kw & card_kw
+    if shared_kw:
+        listed = ", ".join(sorted(k.title() for k in shared_kw))
+        reasons.append(SynergyReason("keywords", f"Shares {listed} with the commander",
+                                     len(shared_kw) * 1.0))
 
     # Word overlap filtered to meaningful words only (len > 4 skips articles, preps, etc.)
     cmd_words = {w for w in commander.oracle_text.lower().split() if len(w) > 4}
     card_words = {w for w in card.oracle_text.lower().split() if len(w) > 4}
-    score += len(cmd_words & card_words) * 0.3
+    shared_words = cmd_words & card_words
+    if shared_words:
+        reasons.append(SynergyReason(
+            "text", f"Rules text echoes the commander ({len(shared_words)} terms)",
+            len(shared_words) * 0.3))
 
     # Tribal synergy
-    score += len(_creature_types(commander.type_line) & _creature_types(card.type_line)) * 3.0
+    shared_types = _creature_types(commander.type_line) & _creature_types(card.type_line)
+    if shared_types:
+        listed = "/".join(sorted(shared_types))
+        reasons.append(SynergyReason("tribal", f"{listed} tribal", len(shared_types) * 3.0))
 
     # CMC preference — cheap creatures mean more casts per game
     if card.cmc <= 4:
-        score += (4.0 - card.cmc) * 0.5
+        reasons.append(SynergyReason("cheap", f"Cheap to cast (mana value {int(card.cmc)})",
+                                     (4.0 - card.cmc) * 0.5))
 
     t = card.oracle_text.lower()
     cmd_text = commander.oracle_text.lower()
@@ -113,45 +164,59 @@ def synergy_score(card: OwnedCard, commander: OwnedCard) -> float:
         if "when this creature enters" in t or (
             "when this enters" in t and "Creature" in card.type_line
         ):
-            score += 3.0
+            reasons.append(SynergyReason(
+                "etb", "Enters-the-battlefield value the commander pays you for", 3.0))
         # Flash creatures can be cast on opponent's turn for extra draw triggers
         if "flash" in card_kw:
-            score += 2.0
+            reasons.append(SynergyReason(
+                "flash", "Flash — casts on their turn for extra draw triggers", 2.0))
         # Land fetch on ETB feeds the commander's "put a land from hand" ability
         if ("search your library for" in t and "land" in t) or "lander token" in t:
-            score += 1.5
+            reasons.append(SynergyReason(
+                "landfetch", "Fetches a land for the commander to put into play", 1.5))
         # Bounce to hand lets ETBs be replayed via the commander's activated ability
         if "return" in t and ("your hand" in t or "owner's hand" in t) and "creature" in t:
-            score += 1.0
+            reasons.append(SynergyReason(
+                "bounce", "Returns creatures to hand so ETBs can be replayed", 1.0))
 
     # Commander drops lands from hand → Landfall triggers every time
     if "put a land card from your hand onto the battlefield" in cmd_text:
         if "landfall" in card_kw:
-            score += 3.0
+            reasons.append(SynergyReason(
+                "landfall", "Landfall, and the commander drops extra lands", 3.0))
 
     # ── Penalties for anti-synergies ────────────────────────────────────────────
 
     # Ripple is useless in a singleton format
     if "ripple" in card_kw:
-        score -= 3.0
+        reasons.append(SynergyReason("ripple", "Ripple does nothing in a singleton deck", -3.0))
 
     # Self-mill for colorless mana is a bad rate and mills away combo pieces
     if "mill a card" in t and "add {c}" in t:
-        score -= 2.5
+        reasons.append(SynergyReason("selfmill", "Mills your own deck for colourless mana", -2.5))
 
     # Giving opponents 1/1 tokens every time you tap a land for mana
     if "whenever you tap this" in t and "opponent" in t and "creature token" in t:
-        score -= 2.0
+        reasons.append(SynergyReason("gifts", "Hands opponents creature tokens", -2.0))
 
     # Equipment draw engine needs Equipment support that this commander doesn't provide
     if "whenever an equipment" in t and "draw a card" in t:
         if "equipment" not in cmd_text and "equip" not in cmd_text:
-            score -= 2.0
+            reasons.append(SynergyReason(
+                "equipment", "Wants Equipment this commander doesn't provide", -2.0))
 
     # Angel tribal synergy without Angels in the deck
     if "whenever an angel you control" in t and "angel" not in cmd_text:
-        score -= 2.0
+        reasons.append(SynergyReason(
+            "angels", "Wants Angels this commander doesn't provide", -2.0))
 
+    return reasons
+
+
+def synergy_score(card: OwnedCard, commander: OwnedCard) -> float:
+    score = 0.0
+    for reason in synergy_reasons(card, commander):
+        score += reason.points
     return score
 
 

@@ -24,9 +24,18 @@ from pydantic import BaseModel
 from arena_collection import detect_collection_format, load_owned_cards
 from card_data import load_scryfall_lookup, enrich_collection
 from commander import find_commanders
-from deck_builder import build_deck
+from deck_builder import (
+    build_deck,
+    synergy_reasons,
+    SYNERGY_THEME_LABELS,
+    GENERIC_SYNERGY_THEMES,
+)
 from edhrec_recs import recommend, _name_key as _edhrec_name_key
-from standard_builder import build_standard_deck
+from standard_builder import (
+    build_standard_deck,
+    synergy_tags as standard_synergy_tags,
+    TAG_LABELS as STANDARD_TAG_LABELS,
+)
 from output import (
     format_deck,
     format_decklist,
@@ -113,8 +122,8 @@ def _category(card) -> str:
     return "Other"
 
 
-def _card_json(card, count: int) -> dict:
-    return {
+def _card_json(card, count: int, reasons: list | None = None) -> dict:
+    payload = {
         "name": card.name,
         "count": count,
         "cmc": int(card.cmc),
@@ -126,6 +135,12 @@ def _card_json(card, count: int) -> dict:
         "oracle_text": card.oracle_text,
         "is_filler": card.is_basic_filler,
     }
+    if reasons is not None:
+        # Strongest pull first, so a truncated list still shows the real reason.
+        ranked = sorted(reasons, key=lambda r: abs(r.points), reverse=True)
+        payload["synergy"] = round(sum(r.points for r in reasons), 1)
+        payload["synergy_why"] = [r.label for r in ranked[:3]]
+    return payload
 
 
 def _pip_demand(pairs: list) -> dict:
@@ -151,12 +166,108 @@ def _curve(pairs: list) -> list:
     return buckets
 
 
+def _commander_synergy(pairs: list, commander) -> tuple[dict, dict]:
+    """Summarise how the deck hangs together, plus per-card reasons by name."""
+    by_name: dict[str, list] = {}
+    themes = Counter()
+    tribal_labels = Counter()
+    scored: list[tuple[float, object]] = []
+    linked = 0
+    drags: list[dict] = []
+
+    for card, _ in pairs:
+        if card.is_basic_filler:
+            continue
+        reasons = synergy_reasons(card, commander)
+        by_name[card.name] = reasons
+        total = sum(r.points for r in reasons)
+        scored.append((total, card))
+
+        real = [r for r in reasons if r.points > 0 and r.key not in GENERIC_SYNERGY_THEMES]
+        if real:
+            linked += 1
+        for reason in real:
+            themes[reason.key] += 1
+            if reason.key == "tribal":
+                tribal_labels[reason.label] += 1
+        penalties = [r for r in reasons if r.points < 0]
+        if penalties:
+            drags.append({"name": card.name, "label": penalties[0].label})
+
+    considered = len(scored)
+    scored.sort(key=lambda pair: (-pair[0], pair[1].name))
+
+    theme_list = []
+    for key, count in themes.most_common():
+        label = SYNERGY_THEME_LABELS.get(key, key)
+        if key == "tribal" and tribal_labels:
+            label = tribal_labels.most_common(1)[0][0]
+        theme_list.append({"label": label, "count": count})
+
+    return {
+        "kind": "commander",
+        "subject": commander.name,
+        "linked": linked,
+        "considered": considered,
+        "headline": (
+            f"{linked} of the {considered} cards drawn from your collection share something "
+            f"with {commander.name} beyond colour."
+        ) if considered else "",
+        "themes": theme_list[:6],
+        "top": [
+            {
+                "name": card.name,
+                "score": round(total, 1),
+                "why": [r.label for r in sorted(by_name[card.name],
+                                                key=lambda r: abs(r.points), reverse=True)[:2]],
+            }
+            for total, card in scored[:6] if total > 0
+        ],
+        "drags": drags[:4],
+    }, by_name
+
+
+def _standard_synergy(pairs: list) -> dict:
+    """Summarise the tag pairings the Standard builder rewarded."""
+    counts = Counter()
+    for card, count in pairs:
+        for tag in standard_synergy_tags(card):
+            counts[tag] += count
+
+    themes = [
+        {"label": STANDARD_TAG_LABELS.get(tag, tag), "count": count}
+        for tag, count in counts.most_common()
+    ]
+    pairings = [
+        f"{counts[source]} {STANDARD_TAG_LABELS[source].lower()} feeding "
+        f"{counts[payoff]} {STANDARD_TAG_LABELS[payoff].lower()}"
+        for source, payoff in (("lifegain_source", "lifegain_payoff"),
+                               ("token_source", "token_payoff"))
+        if counts[source] and counts[payoff]
+    ]
+    return {
+        "kind": "standard",
+        "subject": "",
+        "headline": ("This build leans on " + "; ".join(pairings) + ".") if pairings
+        else "No paired themes here — the builder picked on raw card quality.",
+        "themes": themes[:6],
+        "top": [],
+        "drags": [],
+    }
+
+
 def _deck_payload(pairs: list, *, colors: set, pretty: str, decklist: str,
                   commander=None) -> dict:
     """pairs: list of (OwnedCard, count) for the main deck."""
+    if commander is not None:
+        synergy, reasons_by_name = _commander_synergy(pairs, commander)
+    else:
+        synergy, reasons_by_name = _standard_synergy(pairs), None
+
     grouped: dict[str, list] = {}
     for card, count in pairs:
-        grouped.setdefault(_category(card), []).append(_card_json(card, count))
+        reasons = reasons_by_name.get(card.name) if reasons_by_name is not None else None
+        grouped.setdefault(_category(card), []).append(_card_json(card, count, reasons))
     for cards in grouped.values():
         cards.sort(key=lambda c: (c["is_filler"], c["cmc"], c["name"]))
 
@@ -172,6 +283,7 @@ def _deck_payload(pairs: list, *, colors: set, pretty: str, decklist: str,
         "total": total,
         "curve": _curve(pairs),
         "pips": _pip_demand(pairs),
+        "synergy": synergy,
         "pretty": pretty,
         "decklist": decklist,
     }
