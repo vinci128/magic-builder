@@ -170,6 +170,7 @@ def _commander_synergy(pairs: list, commander) -> tuple[dict, dict]:
     """Summarise how the deck hangs together, plus per-card reasons by name."""
     by_name: dict[str, list] = {}
     themes = Counter()
+    theme_points = Counter()
     tribal_labels = Counter()
     scored: list[tuple[float, object]] = []
     linked = 0
@@ -188,6 +189,7 @@ def _commander_synergy(pairs: list, commander) -> tuple[dict, dict]:
             linked += 1
         for reason in real:
             themes[reason.key] += 1
+            theme_points[reason.key] += reason.points
             if reason.key == "tribal":
                 tribal_labels[reason.label] += 1
         penalties = [r for r in reasons if r.points < 0]
@@ -197,12 +199,20 @@ def _commander_synergy(pairs: list, commander) -> tuple[dict, dict]:
     considered = len(scored)
     scored.sort(key=lambda pair: (-pair[0], pair[1].name))
 
+    # Ranked by how hard each term actually pulled on card selection, not by how
+    # many cards it touched: one shared creature type is worth 3.0 against a
+    # keyword's 1.0, so counting alone would rank a broad weak term over a
+    # narrow decisive one.
     theme_list = []
-    for key, count in themes.most_common():
+    for key, points in sorted(theme_points.items(), key=lambda kv: -kv[1]):
         label = SYNERGY_THEME_LABELS.get(key, key)
         if key == "tribal" and tribal_labels:
             label = tribal_labels.most_common(1)[0][0]
-        theme_list.append({"label": label, "count": count})
+        theme_list.append({
+            "label": label,
+            "count": themes[key],
+            "weight": round(points, 1),
+        })
 
     return {
         "kind": "commander",
@@ -234,8 +244,10 @@ def _standard_synergy(pairs: list) -> dict:
         for tag in standard_synergy_tags(card):
             counts[tag] += count
 
+    # The Standard builder has no per-term weights, so copies played is the
+    # only ranking available — weight mirrors count to keep the payload uniform.
     themes = [
-        {"label": STANDARD_TAG_LABELS.get(tag, tag), "count": count}
+        {"label": STANDARD_TAG_LABELS.get(tag, tag), "count": count, "weight": count}
         for tag, count in counts.most_common()
     ]
     pairings = [

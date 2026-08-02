@@ -367,17 +367,22 @@ function renderSynergy(syn) {
     syn.kind === "commander" ? "Why these cards" : "What this deck is doing";
   $("synergy-headline").textContent = syn.headline;
 
-  // Bars are relative to the most common theme, so the shape reads at a glance.
+  // Bars show how hard each theme pulled on selection, not how many cards it
+  // touched — so the trailing card count can disagree with the bar. The title
+  // spells both out.
   const themes = $("synergy-themes");
   themes.replaceChildren();
-  const peak = Math.max(...syn.themes.map((t) => t.count), 1);
+  const peak = Math.max(...syn.themes.map((t) => t.weight), 1);
   syn.themes.forEach((theme) => {
     const item = document.createElement("div");
     item.className = "syn-theme";
     item.innerHTML = `<span class="syn-theme-name"></span>
-      <span class="syn-bar"><i style="width:${Math.round((theme.count / peak) * 100)}%"></i></span>
+      <span class="syn-bar"><i style="width:${Math.round((theme.weight / peak) * 100)}%"></i></span>
       <span class="syn-theme-count">${theme.count}</span>`;
     item.querySelector(".syn-theme-name").textContent = theme.label;
+    item.title = syn.kind === "commander"
+      ? `${theme.count} cards · ${theme.weight} synergy points`
+      : `${theme.count} copies`;
     themes.append(item);
   });
 
