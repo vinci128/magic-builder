@@ -1,4 +1,4 @@
-"""60-card constructed deck builder (Standard by default).
+"""60-card constructed deck builder (Standard and Pauper).
 
 Unlike Commander, constructed decks want redundancy: up to 4 copies of a card,
 a low curve, and a critical mass of interaction. The builder:
@@ -11,11 +11,16 @@ a low curve, and a critical mass of interaction. The builder:
    (lifegain sources ↔ lifegain payoffs, token makers ↔ token payoffs, ...).
 6. Fills 36-38 non-land slots under per-CMC curve caps, then builds a mana
    base from owned dual lands plus basics weighted by mana-symbol demand.
+7. Picks a 15-card sideboard out of what the main deck left behind, favouring
+   the answers a maindeck can't afford to run (artifact/enchantment removal,
+   graveyard hate, counterspells, sweepers).
 """
 
 import re
 from dataclasses import dataclass, field
 
+import archetype
+import formats
 from collection import OwnedCard
 from deck_builder import BASIC_LAND_NAMES, _is_basic_land, _make_basic
 
@@ -38,8 +43,8 @@ class DeckEntry:
 
 # ── Pool preparation ─────────────────────────────────────────────────────────
 
-def merge_by_name(owned: list) -> list[DeckEntry]:
-    """Collapse printings into one entry per card name, capped at MAX_COPIES."""
+def merge_by_name(owned: list, max_copies: int = MAX_COPIES) -> list[DeckEntry]:
+    """Collapse printings into one entry per card name, capped at `max_copies`."""
     by_name: dict[str, DeckEntry] = {}
     for c in owned:
         entry = by_name.get(c.name)
@@ -48,11 +53,15 @@ def merge_by_name(owned: list) -> list[DeckEntry]:
             # Keep the printing with the richest metadata
             if not entry.card.type_line and c.type_line:
                 entry.card = c
+            # ...and, among equally complete ones, the cheapest: any printing plays the same.
+            elif (c.type_line and c.price_usd
+                  and (not entry.card.price_usd or c.price_usd < entry.card.price_usd)):
+                entry.card = c
         else:
             by_name[c.name] = DeckEntry(card=c, count=c.quantity)
     for entry in by_name.values():
         if not _is_basic_land(entry.card):
-            entry.count = min(entry.count, MAX_COPIES)
+            entry.count = min(entry.count, max_copies)
     return list(by_name.values())
 
 
@@ -193,10 +202,52 @@ TAG_LABELS = {
     "mana_dork": "Mana ramp",
 }
 
+# The one-word version, for naming the deck ("Selesnya Counters").
+TAG_ARCHETYPES = {
+    "counters": "Counters",
+    "token_source": "Tokens",
+    "token_payoff": "Go-Wide",
+    "lifegain_payoff": "Lifegain",
+    "lifegain_source": "Lifegain",
+    "mana_dork": "Ramp",
+}
+
 
 def synergy_tags(card: OwnedCard) -> set:
     """Public view of the tags the builder scores on."""
     return _tags(card)
+
+
+def is_interaction(card: OwnedCard) -> bool:
+    """Public view of the removal/counterspell test the builder reserves slots for."""
+    return _is_interaction(card)
+
+
+def deck_archetype(entries: list[DeckEntry], colors: set) -> str:
+    """Name the deck after its colours and the theme its own cards carry.
+
+    Falls back to a shape word (Aggro / Midrange / Control / Ramp) when no
+    synergy tag has enough copies behind it to be called a theme.
+    """
+    tag_counts: dict[str, int] = {}
+    nonland = weighted = interaction = 0
+    for e in entries:
+        if "Land" in e.card.type_line:
+            continue
+        nonland += e.count
+        weighted += e.card.cmc * e.count
+        if _is_interaction(e.card):
+            interaction += e.count
+        for tag in _tags(e.card):
+            tag_counts[tag] = tag_counts.get(tag, 0) + e.count
+
+    named = [(count, TAG_ARCHETYPES[tag]) for tag, count in tag_counts.items()
+             if tag in TAG_ARCHETYPES]
+    # A theme needs a real share of the deck behind it, or the name overclaims.
+    theme = max(named)[1] if named and max(named)[0] >= 8 else None
+    avg_cmc = (weighted / nonland) if nonland else None
+    share = (interaction / nonland) if nonland else 0.0
+    return archetype.deck_name(colors, theme, avg_cmc=avg_cmc, interaction_share=share)
 
 
 def synergy_boost(card: OwnedCard, pool: list[DeckEntry]) -> float:
@@ -251,19 +302,102 @@ def _build_mana_base(colors: set, nonlands: list[DeckEntry], entries: list[DeckE
     for i, c in enumerate(active):
         n = remaining - allocated if i == len(active) - 1 else round(remaining * symbols[c] / total)
         if n > 0:
-            basic = _make_basic(c, 0)
-            basic.legalities = {"standard": "legal", "commander": "legal"}
-            lands.append(DeckEntry(card=basic, count=n))
+            lands.append(DeckEntry(card=_make_basic(c, 0), count=n))
         allocated += n
     return lands
+
+
+# ── Sideboard ────────────────────────────────────────────────────────────────
+
+# Answers that are dead against half the field, so they belong in the 15 rather
+# than the 60. Weighted by how narrow — and therefore how sideboard-y — they are.
+_HATE_PATTERNS = (
+    ("destroy target artifact", 4.0),
+    ("destroy target enchantment", 4.0),
+    ("exile target artifact", 4.0),
+    ("exile target enchantment", 4.0),
+    ("artifact or enchantment", 4.0),
+    ("from a graveyard", 3.5),
+    ("graveyards", 3.5),
+    ("exile all cards from", 3.5),
+    ("counter target spell", 3.0),
+    ("counter target creature spell", 3.0),
+    ("destroy all creatures", 2.5),
+    ("can't be countered", 2.0),
+    ("protection from", 2.0),
+    ("hexproof", 1.5),
+    ("you gain", 1.0),
+)
+
+SIDEBOARD_CURVE_CAP = 5.0  # a 6-drop is never a sideboard card
+
+
+def sideboard_value(card: OwnedCard) -> float:
+    """How much this card wants to be in the 15 rather than the 60."""
+    if "Land" in card.type_line or card.cmc > SIDEBOARD_CURVE_CAP:
+        return float("-inf")
+    text = card.oracle_text.lower()
+    bonus = sum(weight for pattern, weight in _HATE_PATTERNS if pattern in text)
+    # Rate still matters — a blank card is not a sideboard card either.
+    return bonus + card_power(card) * 0.4
+
+
+def build_sideboard(leftovers: list[DeckEntry], colors: set, size: int) -> list[DeckEntry]:
+    """Fill `size` sideboard slots from the copies the main deck did not take.
+
+    `leftovers` are the merged entries after the main build has decremented
+    them, so the 4-copy cap is already honoured across both boards.
+    """
+    if size <= 0:
+        return []
+    candidates = [
+        e for e in leftovers
+        if e.count > 0 and _castable(e.card, colors) and not _is_basic_land(e.card)
+        and sideboard_value(e.card) > float("-inf")
+    ]
+    candidates.sort(key=lambda e: sideboard_value(e.card), reverse=True)
+
+    board: list[DeckEntry] = []
+    total = 0
+    for e in candidates:
+        if total >= size:
+            break
+        # Two copies is the usual sideboard allotment — spread across more
+        # answers rather than stacking four of one narrow card.
+        take = min(e.count, 2, size - total)
+        if take <= 0:
+            continue
+        board.append(DeckEntry(card=e.card, count=take))
+        e.count -= take
+        total += take
+
+    # Still short (small collection): go back for the extra copies we skipped.
+    for e in candidates:
+        if total >= size:
+            break
+        take = min(e.count, size - total)
+        if take <= 0:
+            continue
+        existing = next((b for b in board if b.card.name == e.card.name), None)
+        if existing:
+            existing.count += take
+        else:
+            board.append(DeckEntry(card=e.card, count=take))
+        e.count -= take
+        total += take
+    return board
 
 
 # ── Main builder ─────────────────────────────────────────────────────────────
 
 def build_standard_deck(owned: list, fmt: str = "standard",
-                        colors: set | None = None) -> tuple[list[DeckEntry], set]:
-    """Build a 60-card deck from the collection. Returns (deck entries, colors used)."""
-    entries = legal_pool(merge_by_name(owned), fmt)
+                        colors: set | None = None) -> tuple[list[DeckEntry], set, list[DeckEntry]]:
+    """Build a constructed deck from the collection.
+
+    Returns (main deck entries, colors used, sideboard entries).
+    """
+    spec = formats.get(fmt)
+    entries = legal_pool(merge_by_name(owned, spec.max_copies), spec.key)
     if colors is None:
         colors = choose_colors(entries)
 
@@ -305,5 +439,6 @@ def build_standard_deck(owned: list, fmt: str = "standard",
             if first_pass:
                 interaction += room
 
-    lands = _build_mana_base(colors, deck, entries, DECK_SIZE - total)
-    return deck + lands, colors
+    lands = _build_mana_base(colors, deck, entries, spec.deck_size - total)
+    sideboard = build_sideboard(entries, colors, spec.sideboard)
+    return deck + lands, colors, sideboard

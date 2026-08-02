@@ -1,5 +1,7 @@
 from typing import NamedTuple
 
+import archetype
+import formats
 from collection import OwnedCard
 
 # Target slot counts for non-land cards
@@ -223,6 +225,58 @@ def synergy_score(card: OwnedCard, commander: OwnedCard) -> float:
     return score
 
 
+# Themes that read as a deck name. Terms not listed here are real synergies but
+# describe a card, not an archetype ("Shares Flying with the commander").
+SYNERGY_ARCHETYPES = {
+    "etb": "Blink",
+    "landfall": "Landfall",
+    "flash": "Flash",
+    "landfetch": "Ramp",
+    "bounce": "Bounce",
+}
+
+
+def deck_archetype(deck: list, commander: OwnedCard) -> str:
+    """Name a singleton deck after its colours and its strongest shared theme.
+
+    Tribal wins when it fires, because that is how players name these decks:
+    a Golgari deck full of Elves is a Golgari Elves deck.
+    """
+    points: dict[str, float] = {}
+    tribes: dict[str, int] = {}
+    nonland = weighted = interaction = 0
+
+    for card in deck:
+        if card.is_basic_filler:
+            continue
+        if not _is_land(card):
+            nonland += 1
+            weighted += card.cmc
+            if _is_removal(card):
+                interaction += 1
+        for reason in synergy_reasons(card, commander):
+            if reason.points <= 0 or reason.key in GENERIC_SYNERGY_THEMES:
+                continue
+            points[reason.key] = points.get(reason.key, 0.0) + reason.points
+            if reason.key == "tribal":
+                for tribe in _creature_types(card.type_line) & _creature_types(commander.type_line):
+                    tribes[tribe] = tribes.get(tribe, 0) + 1
+
+    theme = None
+    if tribes and points.get("tribal", 0) >= 9:  # three creatures' worth of overlap
+        theme = max(tribes.items(), key=lambda kv: kv[1])[0] + "s"
+    else:
+        ranked = [(pts, SYNERGY_ARCHETYPES[key]) for key, pts in points.items()
+                  if key in SYNERGY_ARCHETYPES]
+        if ranked and max(ranked)[0] >= 9:
+            theme = max(ranked)[1]
+
+    avg_cmc = (weighted / nonland) if nonland else None
+    share = (interaction / nonland) if nonland else 0.0
+    return archetype.deck_name(commander.color_identity, theme,
+                               avg_cmc=avg_cmc, interaction_share=share)
+
+
 # ── Basic land generation ────────────────────────────────────────────────────
 
 def _make_basic(color: str, index: int) -> OwnedCard:
@@ -233,7 +287,8 @@ def _make_basic(color: str, index: int) -> OwnedCard:
         quantity=1,
         type_line=f"Basic Land — {name}" if color in BASIC_LAND_NAMES else "Basic Land — Wastes",
         color_identity=[color] if color in BASIC_LAND_NAMES else [],
-        legalities={"commander": "legal"},
+        # Basic lands are legal in every format, and free.
+        legalities={fmt: "legal" for fmt in formats.FORMATS},
         is_basic_filler=True,
     )
 
@@ -271,16 +326,24 @@ def _optimal_basics(ci: set, non_land_deck: list, count: int) -> list:
 
 # ── Main deck-builder ────────────────────────────────────────────────────────
 
-def build_deck(commander: OwnedCard, owned_cards: list) -> list:
+def build_deck(commander: OwnedCard, owned_cards: list, fmt: str = "commander") -> list:
+    """Build the singleton deck behind `commander` (Commander or Brawl).
+
+    Both formats are 1 commander + 99, so only the legality key differs.
+    """
+    spec = formats.get(fmt)
+    if not spec.singleton:
+        raise ValueError(f"{spec.label} is not a singleton format")
+    size = spec.deck_size - 1
     ci = set(commander.color_identity)
 
-    # Eligible pool: matching color identity, Commander-legal, not the commander,
-    # and NOT basic lands (those are added automatically)
+    # Eligible pool: matching color identity, legal in this format, not the
+    # commander, and NOT basic lands (those are added automatically)
     pool = [
         c for c in owned_cards
         if c.name != commander.name
         and set(c.color_identity).issubset(ci)
-        and c.legalities.get("commander") == "legal"
+        and c.legalities.get(spec.key) == "legal"
         and not _is_basic_land(c)
     ]
 
@@ -318,15 +381,15 @@ def build_deck(commander: OwnedCard, owned_cards: list) -> list:
     actual_nonbasic_lands = len(nonbasic_lands)
     basic_count = (NONBASIC_LAND_TARGET - actual_nonbasic_lands) + BASIC_LAND_TARGET
 
-    # Total deck must be 99; fill remaining slots with basics if non-basic pool is small
+    # Fill remaining slots with basics if the non-basic pool is small
     total_non_basic = len(non_basic_deck)
-    if total_non_basic > 99 - basic_count:
-        non_basic_deck = non_basic_deck[:99 - basic_count]
+    if total_non_basic > size - basic_count:
+        non_basic_deck = non_basic_deck[:size - basic_count]
 
     # If even after basics we're short, add extra basics
-    basic_count = 99 - len(non_basic_deck)
+    basic_count = size - len(non_basic_deck)
 
     basics = _optimal_basics(ci, non_basic_deck, basic_count)
     deck = non_basic_deck + basics
 
-    return deck[:99]
+    return deck[:size]

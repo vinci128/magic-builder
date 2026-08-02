@@ -2,12 +2,13 @@ import sys
 
 import click
 
+import formats
 from arena_collection import load_owned_cards
-from card_data import load_scryfall_lookup, enrich_collection
+from card_data import load_scryfall_lookup, load_by_name, enrich_collection
 from commander import find_commanders
-from deck_builder import build_deck
+from deck_builder import build_deck, deck_archetype as commander_archetype
 from edhrec_recs import recommend
-from standard_builder import build_standard_deck
+from standard_builder import build_standard_deck, deck_archetype as constructed_archetype
 from output import print_and_save, print_and_save_standard
 
 
@@ -18,7 +19,7 @@ from output import print_and_save, print_and_save_standard
               help="Skip the EDHREC recommendation pass (works offline).")
 @click.option(
     "--format", "fmt",
-    type=click.Choice(["commander", "standard"]),
+    type=click.Choice(list(formats.FORMATS)),
     default="commander",
     show_default=True,
     help="Deck format to build.",
@@ -27,7 +28,7 @@ from output import print_and_save, print_and_save_standard
     "--colors",
     default=None,
     metavar="WUBRG",
-    help="Force deck colors for standard (e.g. W or UG). Default: auto-pick strongest.",
+    help="Force deck colors for constructed formats (e.g. W or UG). Default: auto-pick strongest.",
 )
 @click.option(
     "--pick",
@@ -37,12 +38,14 @@ from output import print_and_save, print_and_save_standard
     help="Use the Nth-best scoring commander instead of the top one (commander format only).",
 )
 def main(collection_path: str, output: str, no_recs: bool, fmt: str, colors: str | None, pick: int):
-    """Build a Commander or Standard deck from your collection.
+    """Build a Commander, Brawl, Standard or Pauper deck from your collection.
 
     Accepts a ManaBox CSV export, an MTG Arena deck export
     (lines of the form: N Card Name (SET) collector#), or an Arena
     collection CSV scraped from Player.log.
     """
+    spec = formats.get(fmt)
+
     # ── 1. Parse collection ────────────────────────────────────────────────
     print(f"Parsing collection: {collection_path}")
     lookup, by_set_cn = load_scryfall_lookup()
@@ -52,23 +55,27 @@ def main(collection_path: str, output: str, no_recs: bool, fmt: str, colors: str
     # ── 2. Enrich with Scryfall metadata ──────────────────────────────────
     enrich_collection(owned, lookup)
 
-    # ── Standard path ──────────────────────────────────────────────────────
-    if fmt == "standard":
+    # ── Constructed path (Standard, Pauper) ────────────────────────────────
+    if not spec.singleton:
         color_set = set(colors.upper()) if colors else None
-        print("\nBuilding Standard deck...")
-        deck_entries, used_colors = build_standard_deck(owned, colors=color_set)
+        print(f"\nBuilding {spec.label} deck...")
+        deck_entries, used_colors, sideboard = build_standard_deck(
+            owned, fmt=fmt, colors=color_set
+        )
         total = sum(e.count for e in deck_entries)
-        assert total == 60, f"Expected 60 cards, got {total}"
+        assert total == spec.deck_size, f"Expected {spec.deck_size} cards, got {total}"
 
+        name = constructed_archetype(deck_entries, used_colors)
         print()
-        print_and_save_standard(deck_entries, used_colors, output)
+        print_and_save_standard(deck_entries, used_colors, output, sideboard,
+                                format_label=spec.label, name=name)
         return
 
     # ── 3. Find commander candidates ──────────────────────────────────────
     print("\nScoring commander candidates...")
-    commanders = find_commanders(owned)
+    commanders = find_commanders(owned, fmt=fmt)
     if not commanders:
-        click.echo("No Commander-legal legendary creatures found in your collection.", err=True)
+        click.echo(f"No {spec.label}-legal legendary creatures found in your collection.", err=True)
         sys.exit(1)
 
     print(f"\nTop commander candidates:")
@@ -80,12 +87,13 @@ def main(collection_path: str, output: str, no_recs: bool, fmt: str, colors: str
     commander, _ = commanders[idx]
     print(f"\nSelected commander: {commander.name}")
 
-    # ── 4. Build the 99-card deck ──────────────────────────────────────────
+    # ── 4. Build the deck ──────────────────────────────────────────────────
     print("Building deck...")
-    deck = build_deck(commander, owned)
+    deck = build_deck(commander, owned, fmt=fmt)
 
     # Quick sanity checks
-    assert len(deck) == 99, f"Expected 99 cards, got {len(deck)}"
+    expected = spec.deck_size - 1
+    assert len(deck) == expected, f"Expected {expected} cards, got {len(deck)}"
     ci_set = set(commander.color_identity)
     violations = [c for c in deck if not set(c.color_identity).issubset(ci_set)]
     if violations:
@@ -95,11 +103,12 @@ def main(collection_path: str, output: str, no_recs: bool, fmt: str, colors: str
     recs = None
     if not no_recs:
         print("Fetching EDHREC recommendations...")
-        recs = recommend(commander, owned, deck)
+        recs = recommend(commander, owned, deck, card_index=load_by_name())
 
     # ── 6. Output ──────────────────────────────────────────────────────────
     print()
-    print_and_save(commander, deck, output, recs)
+    print_and_save(commander, deck, output, recs,
+                   format_label=spec.label, name=commander_archetype(deck, commander))
 
 
 if __name__ == "__main__":

@@ -13,7 +13,10 @@ from arena_collection import load_owned_cards
 from card_data import load_scryfall_lookup, enrich_collection
 from commander import find_commanders
 from deck_builder import build_deck, synergy_score
-from standard_builder import build_standard_deck as _build_standard
+from standard_builder import (
+    build_standard_deck as _build_standard,
+    deck_archetype as _constructed_archetype,
+)
 
 mcp = FastMCP("magic-builder")
 
@@ -133,41 +136,48 @@ def build_commander_deck(commander_name: str, csv_path: str = CSV_PATH) -> str:
 
 
 @mcp.tool()
-def build_standard_deck(csv_path: str = CSV_PATH, colors: str = "") -> str:
-    """Build a 60-card Standard deck using only Standard-legal cards from the collection.
+def build_standard_deck(csv_path: str = CSV_PATH, colors: str = "", fmt: str = "standard") -> str:
+    """Build a 60-card constructed deck (Standard or Pauper) from the collection.
 
     Picks the strongest mono- or two-color identity (or a forced one), fills up to
-    4 copies per card by rate + synergy under curve constraints, and adds a mana base.
+    4 copies per card by rate + synergy under curve constraints, adds a mana base,
+    and picks a 15-card sideboard from what is left over.
 
     Args:
         csv_path: Path to a ManaBox CSV, Arena export, or Arena log-CSV collection file.
         colors: Optional forced colors, e.g. "W" or "UG". Empty = auto-pick strongest.
+        fmt: "standard" or "pauper".
 
     Returns:
-        JSON with chosen colors, the 60-card list (name, count, type, cmc, oracle text),
-        and a curve/role summary.
+        JSON with the deck name, chosen colors, the 60-card list (name, count, type,
+        cmc, oracle text), the sideboard, and a curve/role summary.
     """
     owned = _get_enriched_collection(csv_path)
     color_set = set(colors.upper()) if colors.strip() else None
-    deck, used_colors = _build_standard(owned, colors=color_set)
+    deck, used_colors, sideboard = _build_standard(owned, fmt=fmt, colors=color_set)
 
-    cards = [
-        {
+    def entry(e):
+        return {
             "count": e.count,
             "name": e.card.name,
             "type_line": e.card.type_line,
             "cmc": e.card.cmc,
             "mana_cost": e.card.mana_cost,
+            "price_usd": e.card.price_usd,
             "oracle_text": e.card.oracle_text,
         }
-        for e in deck
-    ]
+
     return json.dumps({
+        "format": fmt,
+        "name": _constructed_archetype(deck, used_colors),
         "colors": sorted(used_colors),
         "total_cards": sum(e.count for e in deck),
         "lands": sum(e.count for e in deck if "Land" in e.card.type_line),
         "creatures": sum(e.count for e in deck if "Creature" in e.card.type_line),
-        "deck": cards,
+        "price_usd": round(sum((e.card.price_usd or 0.0) * e.count
+                               for e in deck + sideboard), 2),
+        "deck": [entry(e) for e in deck],
+        "sideboard": [entry(e) for e in sideboard],
     }, indent=2)
 
 

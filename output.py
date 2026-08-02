@@ -31,6 +31,18 @@ def _sort_key(card: OwnedCard):
     return (card.cmc, card.name)
 
 
+def deck_price(cards: list, counts: dict | None = None) -> float:
+    """Total USD of a card list; `counts` maps name -> copies for constructed decks."""
+    return sum(
+        (card.price_usd or 0.0) * (counts.get(card.name, 1) if counts else 1)
+        for card in cards
+    )
+
+
+def _money(amount: float) -> str:
+    return f"${amount:,.2f}"
+
+
 def format_recommendations(recs: dict) -> str:
     """Render the EDHREC upgrade / acquisition split as a text section."""
     SEP = "═" * 60
@@ -45,12 +57,16 @@ def format_recommendations(recs: dict) -> str:
     )
     lines.append("")
 
+    def row(r) -> str:
+        price = _money(r.price_usd) if r.price_usd else "—"
+        return (f"{r.name:<34} {r.role:<7} {r.inclusion:>4.0%} of decks   "
+                f"synergy {r.synergy:+.2f}   {price:>9}")
+
     upgrades = recs.get("upgrades") or []
     lines.append(f"Own it, not in the deck ({len(upgrades)})")
     lines.append(DIV)
     if upgrades:
-        for r in upgrades:
-            lines.append(f"{r.name:<34} {r.inclusion:>4.0%} of decks   synergy {r.synergy:+.2f}")
+        lines += [row(r) for r in upgrades]
     else:
         lines.append("Nothing — the builder already used every recommended card you own.")
     lines.append("")
@@ -58,19 +74,26 @@ def format_recommendations(recs: dict) -> str:
     acquire = recs.get("acquire") or []
     lines.append(f"Worth acquiring ({len(acquire)})")
     lines.append(DIV)
-    for r in acquire:
-        lines.append(f"{r.name:<34} {r.inclusion:>4.0%} of decks   synergy {r.synergy:+.2f}")
+    lines += [row(r) for r in acquire]
+    basket = sum(r.price_usd or 0.0 for r in acquire)
+    if basket:
+        lines.append(f"{'':<34} {'':<7} {'':>13}   {'':<15} {_money(basket):>9}  total")
 
     lines.append("")
+    lines.append("Role = Staple (60%+ of decks), Flex (25%+), Tech (below).")
     lines.append("Inclusion = share of this commander's EDHREC decks running the card.")
     lines.append("Synergy = how much more often it appears here than in decks generally.")
     return "\n".join(lines)
 
 
-def format_deck(commander: OwnedCard, deck: list, recs: dict | None = None) -> str:
+def format_deck(commander: OwnedCard, deck: list, recs: dict | None = None,
+                *, format_label: str = "Commander", name: str = "") -> str:
     SEP = "═" * 60
     DIV = "─" * 40
-    lines = [SEP, "  COMMANDER DECK RECOMMENDATION", SEP, ""]
+    heading = f"  {format_label.upper()} DECK RECOMMENDATION"
+    lines = [SEP, heading, SEP, ""]
+    if name:
+        lines += [name, ""]
 
     lines += ["Commander (1)", DIV, f"1 {commander.name}", ""]
 
@@ -92,6 +115,9 @@ def format_deck(commander: OwnedCard, deck: list, recs: dict | None = None) -> s
     total = len(deck) + 1
     fillers_count = sum(1 for c in deck if c.is_basic_filler)
     lines.append(f"Total: {total} cards  (1 commander + {len(deck)} main deck)")
+    price = deck_price([commander] + deck)
+    if price:
+        lines.append(f"Paper value: {_money(price)}")
     if fillers_count:
         lines.append(f"Note: {fillers_count} basic land(s) added as filler — not from your collection.")
 
@@ -109,12 +135,15 @@ def format_decklist(commander: OwnedCard, deck: list) -> str:
     return "\n".join(lines)
 
 
-def format_standard_deck(deck_entries: list, colors: set) -> str:
+def format_standard_deck(deck_entries: list, colors: set, sideboard: list | None = None,
+                         *, format_label: str = "Standard", name: str = "") -> str:
     """Pretty-print a 60-card constructed deck (entries carry a count)."""
     SEP = "═" * 60
     DIV = "─" * 40
     color_str = "".join(c for c in "WUBRG" if c in colors) or "C"
-    lines = [SEP, f"  STANDARD DECK RECOMMENDATION  [{color_str}]", SEP, ""]
+    lines = [SEP, f"  {format_label.upper()} DECK RECOMMENDATION  [{color_str}]", SEP, ""]
+    if name:
+        lines += [name, ""]
 
     cats = _categorize([e.card for e in deck_entries])
     by_name = {e.card.name: e for e in deck_entries}
@@ -130,29 +159,53 @@ def format_standard_deck(deck_entries: list, colors: set) -> str:
             total += e.count
         lines.append("")
 
-    lines.append(f"Total: {total} cards")
+    if sideboard:
+        side_total = sum(e.count for e in sideboard)
+        lines.append(f"Sideboard ({side_total})")
+        lines.append(DIV)
+        for e in sorted(sideboard, key=lambda x: _sort_key(x.card)):
+            lines.append(f"{e.count} {e.card.name}")
+        lines.append("")
+
+    lines.append(f"Total: {total} cards" + (f" + {sum(e.count for e in sideboard)} sideboard"
+                                            if sideboard else ""))
+    counts = {e.card.name: e.count for e in deck_entries + list(sideboard or [])}
+    price = deck_price([e.card for e in deck_entries + list(sideboard or [])], counts)
+    if price:
+        lines.append(f"Paper value: {_money(price)}")
     return "\n".join(lines)
 
 
-def format_standard_decklist(deck_entries: list) -> str:
+def format_standard_decklist(deck_entries: list, sideboard: list | None = None) -> str:
     """Arena-importable list: `N Card Name` per line, lands last."""
-    ordered = sorted(deck_entries, key=lambda e: ("Land" in e.card.type_line, e.card.cmc, e.card.name))
-    return "\n".join(f"{e.count} {e.card.name}" for e in ordered)
+    def block(entries):
+        ordered = sorted(entries, key=lambda e: ("Land" in e.card.type_line,
+                                                 e.card.cmc, e.card.name))
+        return "\n".join(f"{e.count} {e.card.name}" for e in ordered)
+
+    main = block(deck_entries)
+    if not sideboard:
+        return main
+    return f"{main}\n\nSideboard\n{block(sideboard)}"
 
 
-def print_and_save_standard(deck_entries: list, colors: set, output_path: str):
-    pretty = format_standard_deck(deck_entries, colors)
+def print_and_save_standard(deck_entries: list, colors: set, output_path: str,
+                            sideboard: list | None = None, *,
+                            format_label: str = "Standard", name: str = ""):
+    pretty = format_standard_deck(deck_entries, colors, sideboard,
+                                  format_label=format_label, name=name)
     print(pretty)
     Path(output_path).write_text(pretty, encoding="utf-8")
     import_path = Path(output_path).with_suffix(".decklist.txt")
-    import_path.write_text(format_standard_decklist(deck_entries), encoding="utf-8")
+    import_path.write_text(format_standard_decklist(deck_entries, sideboard), encoding="utf-8")
     print(f"\nSaved to: {output_path}")
     print(f"Arena import list: {import_path}")
 
 
 def print_and_save(commander: OwnedCard, deck: list, output_path: str,
-                   recs: dict | None = None):
-    pretty = format_deck(commander, deck, recs)
+                   recs: dict | None = None, *,
+                   format_label: str = "Commander", name: str = ""):
+    pretty = format_deck(commander, deck, recs, format_label=format_label, name=name)
     importable = format_decklist(commander, deck)
 
     print(pretty)

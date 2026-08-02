@@ -18,6 +18,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from card_data import name_key as _name_key
 from collection import OwnedCard
 
 CACHE_DIR = Path(".cache/edhrec")
@@ -54,16 +55,25 @@ class Recommendation:
     inclusion: float = 0.0        # 0..1, share of this commander's decks running it
     num_decks: int = 0
     owned: OwnedCard | None = None
+    price_usd: float = 0.0        # cheapest printing, 0.0 when Scryfall has no price
 
     @property
     def category(self) -> str:
         return self.categories[0] if self.categories else ""
 
+    @property
+    def role(self) -> str:
+        """How settled this card is in the archetype, from its inclusion rate.
 
-def _name_key(name: str) -> str:
-    """Match Scryfall and EDHREC spellings: front face only, casing and punctuation ignored."""
-    front = name.split("//")[0]
-    return re.sub(r"[^a-z0-9 ]", "", front.lower()).strip()
+        A staple is what the deck is expected to run; tech is a card a minority
+        of pilots chose deliberately, which is where the interesting choices —
+        and the ones worth arguing with — live.
+        """
+        if self.inclusion >= 0.60:
+            return "Staple"
+        if self.inclusion >= 0.25:
+            return "Flex"
+        return "Tech"
 
 
 def _slug(name: str) -> str:
@@ -121,8 +131,12 @@ def recommend(
     deck: list,
     limit: int = 20,
     refresh: bool = False,
+    card_index: dict | None = None,
 ) -> dict:
     """Split EDHREC's recommendations for `commander` into upgrades and acquisitions.
+
+    `card_index` is card_data.load_by_name(); pass it to price the cards you
+    don't own, which is the whole point of the acquisition list.
 
     Returns {"upgrades": [...], "acquire": [...], "in_deck": int, "total": int},
     or {"error": "..."} if EDHREC could not be reached.
@@ -158,8 +172,12 @@ def recommend(
         if card is not None:
             if set(card.color_identity).issubset(set(commander.color_identity)):
                 rec.owned = card
+                rec.price_usd = card.price_usd or 0.0
                 upgrades.append(rec)
         else:
+            if card_index is not None:
+                data = card_index.get(key)
+                rec.price_usd = (data.get("price_usd") or 0.0) if data is not None else 0.0
             acquire.append(rec)
 
     # Owned cards: lead with the ones most specific to this commander.

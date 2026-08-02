@@ -38,26 +38,24 @@
 
       <div class="stats" id="stats" hidden>
         <div class="stat-file"><span id="stat-filename"></span><span class="tag" id="stat-format"></span></div>
-        <dl class="stat-grid">
-          <div><dt>Unique cards</dt><dd id="stat-unique">—</dd></div>
-          <div><dt>Total copies</dt><dd id="stat-total">—</dd></div>
-          <div><dt>Commander legal</dt><dd id="stat-cmd">—</dd></div>
-          <div><dt>Standard legal</dt><dd id="stat-std">—</dd></div>
-        </dl>
+        <dl class="stat-grid" id="stat-grid"></dl>
         <div class="pip-meter" id="collection-colors" aria-label="Colour makeup of the collection"></div>
+        <p class="stat-value" id="stat-value" hidden></p>
       </div>
     </section>
 
     <section class="panel" id="build-panel" hidden>
       <h2 class="panel-title">2 · Format</h2>
 
-      <div class="tabs" role="tablist">
+      <div class="tabs" role="tablist" id="format-tabs">
         <button class="tab is-on" role="tab" aria-selected="true" data-format="commander">Commander</button>
+        <button class="tab" role="tab" aria-selected="false" data-format="brawl">Brawl</button>
         <button class="tab" role="tab" aria-selected="false" data-format="standard">Standard</button>
+        <button class="tab" role="tab" aria-selected="false" data-format="pauper">Pauper</button>
       </div>
 
       <div class="tabpane" id="pane-commander">
-        <p class="pane-note">Ranked by how much of your collection fits each commander's colour identity.</p>
+        <p class="pane-note" id="pane-commander-note">Ranked by how much of your collection fits each commander's colour identity.</p>
         <label class="check">
           <input type="checkbox" id="opt-edhrec">
           <span>Weight by EDHREC popularity <em>(slower — one lookup per candidate)</em></span>
@@ -66,7 +64,7 @@
       </div>
 
       <div class="tabpane" id="pane-standard" hidden>
-        <p class="pane-note">Leave every colour off to let the builder pick the strongest identity in your pool.</p>
+        <p class="pane-note" id="pane-standard-note">Leave every colour off to let the builder pick the strongest identity in your pool.</p>
         <div class="color-picker" id="color-picker">
           <button class="color-btn" data-color="W" aria-pressed="false"><span class="pip pip-W"></span>White</button>
           <button class="color-btn" data-color="U" aria-pressed="false"><span class="pip pip-U"></span>Blue</button>
@@ -90,7 +88,7 @@
       <ol class="empty-steps">
         <li><span>Export</span> your collection from ManaBox or scrape it from Arena.</li>
         <li><span>Drop</span> the file in the panel on the left.</li>
-        <li><span>Build</span> a 100-card Commander deck or a 60-card Standard list.</li>
+        <li><span>Build</span> a 100-card Commander or Brawl deck, or a 60-card Standard or Pauper list.</li>
       </ol>
     </div>
 
@@ -113,7 +111,7 @@
         <div class="figure">
           <div class="figure-head">
             <h3>Mana curve</h3>
-            <p class="figure-note"><span id="deck-count">—</span> cards · <span id="deck-avg">—</span> average mana value · <span id="deck-lands">—</span> lands</p>
+            <p class="figure-note"><span id="deck-count">—</span> cards · <span id="deck-avg">—</span> average mana value · <span id="deck-lands">—</span> lands<span id="deck-price-wrap" hidden> · <span id="deck-price">—</span> paper</span></p>
           </div>
           <div class="curve" id="curve" role="img" aria-label="Cards by mana value"></div>
         </div>
@@ -143,6 +141,14 @@
       </div>
 
       <div class="columns" id="columns"></div>
+
+      <section class="sideboard" id="sideboard" hidden>
+        <div class="figure-head">
+          <h3>Sideboard <span id="sideboard-count"></span></h3>
+          <p class="figure-note">The best of what the main deck left behind, hate cards first — artifact and enchantment removal, graveyard hate, counterspells — when your collection has them.</p>
+        </div>
+        <div class="columns" id="sideboard-cards"></div>
+      </section>
 
       <pre class="plain" id="plain" hidden></pre>
 

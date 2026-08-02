@@ -220,6 +220,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
   color: var(--ink);
 }
 
+.stat-value {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
 /* ── Pip meter (stacked colour bar) ───────────────────────────────────── */
 
 .pip-meter { display: flex; gap: 2px; height: 26px; }
@@ -255,7 +261,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(4, 1fr);
   gap: 2px;
   background: var(--rule-soft);
   border-radius: var(--radius);
@@ -267,8 +273,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   background: none;
   border: 0;
   border-radius: 2px;
-  padding: 8px;
-  font-size: 14px;
+  padding: 8px 4px;
+  font-size: 12.5px;
   color: var(--ink-3);
 }
 
@@ -698,11 +704,37 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .rec {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 44px minmax(0, 1fr) auto auto;
   align-items: baseline;
   gap: 10px;
   padding: 5px 0;
   font-size: 13.5px;
+}
+
+.rec-role {
+  font-family: var(--data);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.rec-role[data-role="Staple"] { color: var(--brass); }
+
+.rec-price {
+  font-family: var(--data);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+}
+
+.rec-foot {
+  margin: 10px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--rule);
+  font-family: var(--data);
+  font-size: 11px;
+  color: var(--ink-2);
 }
 
 .rec + .rec { border-top: 1px solid rgba(41, 49, 60, 0.4); }
@@ -732,6 +764,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .rec-col.is-own .rec-bar i span { background: var(--G); }
 
 .rec-empty { padding: 10px 0; font-size: 13px; color: var(--ink-3); }
+
+/* ── Sideboard ────────────────────────────────────────────────────────── */
+
+.sideboard { margin-top: 28px; }
+.sideboard .columns { margin-top: 0; }
 
 /* ── Card preview ─────────────────────────────────────────────────────── */
 

@@ -2,11 +2,18 @@ const $ = (id) => document.getElementById(id);
 
 const COLOR_NAMES = { W: "White", U: "Blue", B: "Black", R: "Red", G: "Green", C: "Colorless" };
 
+// Formats built around a commander, as opposed to constructed 4-of decks.
+// Mirrors formats.py — the tabs in index.html are the same four keys.
+const SINGLETON = new Set(["commander", "brawl"]);
+
+const money = (n) =>
+  n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: n < 100 ? 2 : 0 });
+
 const state = {
   collectionId: null,
   format: "commander",
   commander: null,      // chosen commander name, null = best available
-  colors: new Set(),    // forced Standard colours
+  colors: new Set(),    // forced colours for constructed formats
   deck: null,
 };
 
@@ -86,11 +93,25 @@ function renderStats(data) {
   $("stats").hidden = false;
   $("stat-filename").textContent = data.filename || "collection";
   $("stat-format").textContent = data.source_format;
-  $("stat-unique").textContent = data.unique.toLocaleString();
-  $("stat-total").textContent = data.total.toLocaleString();
-  $("stat-cmd").textContent = data.commander_legal.toLocaleString();
-  $("stat-std").textContent = data.standard_legal.toLocaleString();
+
+  const cells = [
+    ["Unique cards", data.unique.toLocaleString()],
+    ["Total copies", data.total.toLocaleString()],
+    ...data.formats.map((f) => [`${f.label} legal`, (data.legal[f.key] || 0).toLocaleString()]),
+  ];
+  const grid = $("stat-grid");
+  grid.replaceChildren();
+  for (const [label, value] of cells) {
+    const cell = document.createElement("div");
+    cell.innerHTML = "<dt></dt><dd></dd>";
+    cell.querySelector("dt").textContent = label;
+    cell.querySelector("dd").textContent = value;
+    grid.append(cell);
+  }
+
   renderPipMeter($("collection-colors"), data.colors);
+  $("stat-value").hidden = !data.value;
+  if (data.value) $("stat-value").textContent = `${money(data.value)} of paper, at Scryfall's prices.`;
 }
 
 // ── Pip meter: stacked colour bar, every segment labelled ───────────────────
@@ -118,14 +139,18 @@ function renderPipMeter(el, counts) {
 
 document.querySelectorAll(".tab").forEach((tab) => {
   tab.addEventListener("click", () => {
+    const previous = state.format;
     state.format = tab.dataset.format;
     document.querySelectorAll(".tab").forEach((t) => {
       const on = t === tab;
       t.classList.toggle("is-on", on);
       t.setAttribute("aria-selected", String(on));
     });
-    $("pane-commander").hidden = state.format !== "commander";
-    $("pane-standard").hidden = state.format !== "standard";
+    const singleton = SINGLETON.has(state.format);
+    $("pane-commander").hidden = !singleton;
+    $("pane-standard").hidden = singleton;
+    // Brawl and Commander rank different card pools, so the list has to be redrawn.
+    if (singleton && state.format !== previous) loadCommanders();
   });
 });
 
@@ -144,19 +169,23 @@ $("opt-edhrec").addEventListener("change", loadCommanders);
 
 async function loadCommanders() {
   if (!state.collectionId) return;
+  const fmt = SINGLETON.has(state.format) ? state.format : "commander";
   const list = $("commander-list");
   const edhrec = $("opt-edhrec").checked;
   list.innerHTML = '<p class="pane-note">Scoring commanders…</p>';
 
   try {
     const res = await fetch(
-      `/api/collection/${state.collectionId}/commanders?limit=30&edhrec=${edhrec}`
+      `/api/collection/${state.collectionId}/commanders?limit=30&edhrec=${edhrec}&fmt=${fmt}`
     );
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Could not score commanders.");
+    // A slower request for a tab the user has since left must not overwrite it.
+    if (SINGLETON.has(state.format) && state.format !== fmt) return;
     list.replaceChildren();
     if (!data.commanders.length) {
-      list.innerHTML = '<p class="pane-note">No Commander-legal legendary creatures here. The Standard tab still works.</p>';
+      list.innerHTML = '<p class="pane-note">No legendary creatures legal in this format. The constructed tabs still work.</p>';
+      state.commander = null;
       return;
     }
     data.commanders.forEach((card, i) => {
@@ -193,11 +222,11 @@ async function build() {
   showError("build-error", "");
   setWorking(true, "Building the deck…");
 
-  const commanderMode = state.format === "commander";
+  const commanderMode = SINGLETON.has(state.format);
   const url = `/api/collection/${state.collectionId}/deck/${commanderMode ? "commander" : "standard"}`;
   const payload = commanderMode
-    ? { commander_name: state.commander }
-    : { colors: [...state.colors].join("") || null };
+    ? { commander_name: state.commander, fmt: state.format }
+    : { colors: [...state.colors].join("") || null, fmt: state.format };
 
   try {
     const res = await fetch(url, {
@@ -235,16 +264,16 @@ function renderDeck(deck) {
   void $("deck").offsetWidth;
   $("deck").classList.add("enter");
 
-  const label = deck.colors.map((c) => COLOR_NAMES[c] || c).join(" · ");
   if (deck.commander) {
-    $("deck-kicker").textContent = "Commander";
+    $("deck-kicker").textContent = `${deck.format_label} · ${deck.archetype}`;
     $("deck-name").textContent = deck.commander.name;
     $("deck-type").textContent = deck.commander.type_line;
     attachPreview($("deck-name"), deck.commander.image_url);
   } else {
-    $("deck-kicker").textContent = "Standard";
-    $("deck-name").textContent = `${label} deck`;
-    $("deck-type").textContent = "60 cards, Standard legal, built from what you own";
+    $("deck-kicker").textContent = deck.format_label;
+    $("deck-name").textContent = deck.archetype;
+    $("deck-type").textContent =
+      `${deck.total} cards, ${deck.format_label} legal, built from what you own`;
   }
   $("deck-identity").innerHTML = pips(deck.colors);
 
@@ -254,11 +283,14 @@ function renderDeck(deck) {
   $("deck-count").textContent = deck.total;
   $("deck-avg").textContent = nonland ? (weighted / nonland).toFixed(2) : "0";
   $("deck-lands").textContent = lands;
+  $("deck-price-wrap").hidden = !deck.price;
+  if (deck.price) $("deck-price").textContent = money(deck.price);
 
   renderCurve(deck.curve);
   renderPipMeter($("deck-pips"), deck.pips);
   renderSynergy(deck.synergy);
-  renderColumns(deck.categories);
+  renderColumns($("columns"), deck.categories);
+  renderSideboard(deck);
 
   $("plain").textContent = deck.pretty;
   $("plain").hidden = true;
@@ -293,13 +325,14 @@ async function loadRecommendations(commanderName) {
     renderRecColumn("Own it, not in the deck", "is-own", data.upgrades,
       "The builder already used every recommended card you own.");
     renderRecColumn("Worth acquiring", "is-buy", data.acquire,
-      "EDHREC has nothing to add here.");
+      "EDHREC has nothing to add here.",
+      data.acquire_price ? `${money(data.acquire_price)} for all ${data.acquire.length}` : "");
   } catch (err) {
     $("recs-note").textContent = err.message;
   }
 }
 
-function renderRecColumn(title, variant, recs, emptyText) {
+function renderRecColumn(title, variant, recs, emptyText, footNote = "") {
   const col = document.createElement("section");
   col.className = `rec-col ${variant} enter`;
   const head = document.createElement("div");
@@ -323,13 +356,24 @@ function renderRecColumn(title, variant, recs, emptyText) {
     const row = document.createElement("div");
     row.className = "rec";
     const pct = Math.round(rec.inclusion * 100);
-    row.innerHTML = `<span class="rec-name"></span>
+    // Role first: it says at a glance whether this is a card the archetype
+    // expects or one a minority of pilots chose.
+    row.innerHTML = `<span class="rec-role" data-role="${rec.role}">${rec.role}</span>
+      <span class="rec-name"></span>
+      <span class="rec-price">${rec.price ? money(rec.price) : ""}</span>
       <span class="rec-bar"><i><span style="width:${Math.min(pct, 100)}%"></span></i>${pct}%</span>`;
     row.querySelector(".rec-name").textContent = rec.name;
-    row.title = `${rec.type_line || rec.category} — in ${pct}% of ${rec.num_decks.toLocaleString()} decks, synergy ${rec.synergy >= 0 ? "+" : ""}${rec.synergy.toFixed(2)}`;
+    row.title = `${rec.type_line || rec.category} — ${rec.role.toLowerCase()}, in ${pct}% of ${rec.num_decks.toLocaleString()} decks, synergy ${rec.synergy >= 0 ? "+" : ""}${rec.synergy.toFixed(2)}${rec.price ? ` · ${money(rec.price)}` : ""}`;
     attachPreview(row, rec.image_url);
     col.append(row);
   });
+
+  if (footNote) {
+    const foot = document.createElement("p");
+    foot.className = "rec-foot";
+    foot.textContent = footNote;
+    col.append(foot);
+  }
 
   $("recs-grid").append(col);
 }
@@ -420,8 +464,20 @@ function renderSynergy(syn) {
   }
 }
 
-function renderColumns(categories) {
-  const el = $("columns");
+function renderSideboard(deck) {
+  const section = $("sideboard");
+  if (!deck.sideboard || !deck.sideboard.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  $("sideboard-count").textContent = `(${deck.sideboard_total})`;
+  renderColumns($("sideboard-cards"), [
+    { name: "Sideboard", count: deck.sideboard_total, cards: deck.sideboard },
+  ]);
+}
+
+function renderColumns(el, categories) {
   el.replaceChildren();
   categories.forEach((cat, i) => {
     const box = document.createElement("section");
@@ -450,11 +506,12 @@ function renderColumns(categories) {
         if (card.synergy < 0) syn.classList.add("is-drag");
       }
       const why = (card.synergy_why || []).join(" · ");
+      const priced = card.price ? `${card.type_line} · ${money(card.price)}` : card.type_line;
       row.title = card.is_filler
         ? `${card.type_line} — added as filler, not from your collection`
         : why
-          ? `${card.type_line}\nSynergy ${card.synergy.toFixed(1)} — ${why}`
-          : card.type_line;
+          ? `${priced}\nSynergy ${card.synergy.toFixed(1)} — ${why}`
+          : priced;
       attachPreview(row, card.image_url);
       box.append(row);
     });
@@ -500,9 +557,9 @@ $("copy-list").addEventListener("click", async () => {
 
 $("download-list").addEventListener("click", () => {
   if (!state.deck) return;
-  const name = state.deck.commander
-    ? state.deck.commander.name.replace(/[^a-z0-9]+/gi, "_").toLowerCase()
-    : `standard_${state.deck.colors.join("").toLowerCase()}`;
+  const name = (state.deck.commander ? state.deck.commander.name : state.deck.archetype)
+    .replace(/[^a-z0-9]+/gi, "_")
+    .toLowerCase();
   const blob = new Blob([state.deck.decklist], { type: "text/plain" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);

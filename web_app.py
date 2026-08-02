@@ -21,18 +21,21 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+import formats
 from arena_collection import detect_collection_format, load_owned_cards
-from card_data import load_scryfall_lookup, enrich_collection
+from card_data import load_scryfall_lookup, load_by_name, enrich_collection, name_key
 from commander import find_commanders
 from deck_builder import (
     build_deck,
+    deck_archetype as commander_archetype,
     synergy_reasons,
     SYNERGY_THEME_LABELS,
     GENERIC_SYNERGY_THEMES,
 )
-from edhrec_recs import recommend, _name_key as _edhrec_name_key
+from edhrec_recs import recommend
 from standard_builder import (
     build_standard_deck,
+    deck_archetype as constructed_archetype,
     synergy_tags as standard_synergy_tags,
     TAG_LABELS as STANDARD_TAG_LABELS,
 )
@@ -134,6 +137,7 @@ def _card_json(card, count: int, reasons: list | None = None) -> dict:
         "image_url": card.image_url,
         "oracle_text": card.oracle_text,
         "is_filler": card.is_basic_filler,
+        "price": round(card.price_usd or 0.0, 2),
     }
     if reasons is not None:
         # Strongest pull first, so a truncated list still shows the real reason.
@@ -269,6 +273,7 @@ def _standard_synergy(pairs: list) -> dict:
 
 
 def _deck_payload(pairs: list, *, colors: set, pretty: str, decklist: str,
+                  fmt: str, archetype: str, sideboard: list | None = None,
                   commander=None) -> dict:
     """pairs: list of (OwnedCard, count) for the main deck."""
     if commander is not None:
@@ -288,11 +293,22 @@ def _deck_payload(pairs: list, *, colors: set, pretty: str, decklist: str,
         for name in CATEGORY_ORDER if name in grouped
     ]
     total = sum(count for _, count in pairs) + (1 if commander else 0)
+    side = [_card_json(card, count) for card, count in (sideboard or [])]
+    price = sum((card.price_usd or 0.0) * count for card, count in pairs)
+    price += sum((card.price_usd or 0.0) * count for card, count in (sideboard or []))
+    if commander is not None:
+        price += commander.price_usd or 0.0
     return {
         "commander": _card_json(commander, 1) if commander else None,
+        "format": fmt,
+        "format_label": formats.get(fmt).label,
+        "archetype": archetype,
         "colors": [c for c in "WUBRG" if c in colors] or ["C"],
         "categories": categories,
+        "sideboard": side,
+        "sideboard_total": sum(count for _, count in (sideboard or [])),
         "total": total,
+        "price": round(price, 2),
         "curve": _curve(pairs),
         "pips": _pip_demand(pairs),
         "synergy": synergy,
@@ -367,18 +383,26 @@ async def upload_collection(file: UploadFile = File(...)):
         "colors": {c: colors.get(c, 0) for c in "WUBRGC" if colors.get(c)},
         "types": {t: types[t] for t in CATEGORY_ORDER if types.get(t)},
         "rarities": dict(rarities),
-        "commander_legal": sum(1 for c in owned if c.legalities.get("commander") == "legal"),
-        "standard_legal": sum(1 for c in owned if c.legalities.get("standard") == "legal"),
+        "legal": {
+            key: sum(1 for c in owned if c.legalities.get(spec.key) == "legal")
+            for key, spec in formats.FORMATS.items()
+        },
+        "formats": [
+            {"key": key, "label": spec.label, "singleton": spec.singleton}
+            for key, spec in formats.FORMATS.items()
+        ],
+        "value": round(sum((c.price_usd or 0.0) * c.quantity for c in owned), 2),
     }
 
 
 @app.get("/api/collection/{sid}/commanders")
-def list_commanders(sid: str, limit: int = 24, edhrec: bool = False):
+def list_commanders(sid: str, limit: int = 24, edhrec: bool = False, fmt: str = "commander"):
     session = _session(sid)
-    cache_key = "commanders_edhrec" if edhrec else "commanders"
+    _singleton_spec(fmt)
+    cache_key = f"commanders:{fmt}:{'edhrec' if edhrec else 'fast'}"
     ranked = session.get(cache_key)
     if ranked is None:
-        ranked = find_commanders(session["owned"], use_popularity=edhrec)
+        ranked = find_commanders(session["owned"], use_popularity=edhrec, fmt=fmt)
         session[cache_key] = ranked
     return {
         "commanders": [
@@ -391,11 +415,33 @@ def list_commanders(sid: str, limit: int = 24, edhrec: bool = False):
 
 class CommanderDeckRequest(BaseModel):
     commander_name: str | None = None
+    fmt: str = "commander"
+
+
+def _singleton_spec(fmt: str):
+    try:
+        spec = formats.get(fmt)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    if not spec.singleton:
+        raise HTTPException(400, f"{spec.label} has no commander.")
+    return spec
+
+
+def _constructed_spec(fmt: str):
+    try:
+        spec = formats.get(fmt)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    if spec.singleton:
+        raise HTTPException(400, f"{spec.label} needs a commander — use the commander route.")
+    return spec
 
 
 @app.post("/api/collection/{sid}/deck/commander")
 def build_commander_deck(sid: str, req: CommanderDeckRequest):
     session = _session(sid)
+    spec = _singleton_spec(req.fmt)
     owned = session["owned"]
 
     if req.commander_name:
@@ -403,86 +449,84 @@ def build_commander_deck(sid: str, req: CommanderDeckRequest):
         if commander is None:
             raise HTTPException(404, f"{req.commander_name} isn't in this collection.")
     else:
-        ranked = session.get("commanders") or find_commanders(owned, use_popularity=False)
-        session["commanders"] = ranked
+        cache_key = f"commanders:{req.fmt}:fast"
+        ranked = session.get(cache_key) or find_commanders(owned, use_popularity=False,
+                                                           fmt=req.fmt)
+        session[cache_key] = ranked
         if not ranked:
-            raise HTTPException(422, "No Commander-legal legendary creatures in this collection.")
+            raise HTTPException(422, f"No {spec.label}-legal legendary creatures in this collection.")
         commander = ranked[0][0]
 
-    deck = build_deck(commander, owned)
+    deck = build_deck(commander, owned, fmt=req.fmt)
     # Kept so /recommendations can diff EDHREC's list against what was actually built.
     session.setdefault("decks", {})[commander.name] = deck
+    name = commander_archetype(deck, commander)
 
     pairs = [(card, 1) for card in deck]
     return _deck_payload(
         pairs,
         colors=set(commander.color_identity),
-        pretty=format_deck(commander, deck),
+        pretty=format_deck(commander, deck, format_label=spec.label, name=name),
         decklist=format_decklist(commander, deck),
+        fmt=req.fmt,
+        archetype=name,
         commander=commander,
     )
 
 
 class StandardDeckRequest(BaseModel):
     colors: str | None = None
+    fmt: str = "standard"
 
 
 @app.post("/api/collection/{sid}/deck/standard")
 def build_standard(sid: str, req: StandardDeckRequest):
     session = _session(sid)
+    spec = _constructed_spec(req.fmt)
     forced = set(req.colors.upper()) if req.colors else None
     if forced and not forced.issubset(set("WUBRG")):
         raise HTTPException(400, "Colors must be any of W, U, B, R, G.")
 
     try:
-        entries, colors = build_standard_deck(session["owned"], colors=forced)
+        entries, colors, sideboard = build_standard_deck(
+            session["owned"], fmt=req.fmt, colors=forced
+        )
     except Exception as exc:
-        raise HTTPException(422, f"Could not build a Standard deck: {exc}")
+        raise HTTPException(422, f"Could not build a {spec.label} deck: {exc}")
     if not entries:
-        raise HTTPException(422, "Not enough Standard-legal cards in this collection.")
+        raise HTTPException(422, f"Not enough {spec.label}-legal cards in this collection.")
 
+    name = constructed_archetype(entries, colors)
     pairs = [(e.card, e.count) for e in entries]
     return _deck_payload(
         pairs,
         colors=colors,
-        pretty=format_standard_deck(entries, colors),
-        decklist=format_standard_decklist(entries),
+        pretty=format_standard_deck(entries, colors, sideboard,
+                                    format_label=spec.label, name=name),
+        decklist=format_standard_decklist(entries, sideboard),
+        fmt=req.fmt,
+        archetype=name,
+        sideboard=[(e.card, e.count) for e in sideboard],
     )
 
 
 # ── EDHREC recommendations ───────────────────────────────────────────────────
 
-_name_index: dict[str, dict] | None = None
-_name_index_lock = threading.Lock()
-
-
-def _scryfall_by_name() -> dict:
-    """Name-keyed view of the bulk data, built once — EDHREC gives names, not ids."""
-    global _name_index
-    if _name_index is None:
-        with _name_index_lock:
-            if _name_index is None:
-                lookup, _ = load_scryfall_lookup()
-                index: dict[str, dict] = {}
-                for card in lookup.values():
-                    index.setdefault(_edhrec_name_key(card["name"]), card)
-                _name_index = index
-    return _name_index
-
-
 def _rec_json(rec) -> dict:
     """Serialize a Recommendation; fill card details from the collection or Scryfall."""
     card = rec.owned
-    data = _scryfall_by_name().get(_edhrec_name_key(rec.name)) if card is None else None
+    data = load_by_name().get(name_key(rec.name)) if card is None else None
     # CardView stores image_uris as the "normal" URL string, not a dict.
     image_url = data.get("image_uris", "") if data is not None else ""
     return {
         "name": rec.name,
         "category": rec.category,
+        "role": rec.role,
         "synergy": round(rec.synergy, 3),
         "inclusion": round(rec.inclusion, 3),
         "num_decks": rec.num_decks,
         "owned": card is not None,
+        "price": round(rec.price_usd or 0.0, 2),
         "type_line": card.type_line if card else (data.get("type_line", "") if data else ""),
         "mana_cost": card.mana_cost if card else (data.get("mana_cost", "") if data else ""),
         "image_url": card.image_url if card else image_url,
@@ -501,14 +545,17 @@ def recommendations(sid: str, commander: str, limit: int = 20, refresh: bool = F
     if commander_card is None:
         raise HTTPException(404, f"{commander} isn't in this collection.")
 
-    result = recommend(commander_card, session["owned"], deck, limit=limit, refresh=refresh)
+    result = recommend(commander_card, session["owned"], deck, limit=limit,
+                       refresh=refresh, card_index=load_by_name())
+    acquire = [_rec_json(r) for r in result["acquire"]]
     return {
         "commander": commander,
         "error": result.get("error", ""),
         "in_deck": result["in_deck"],
         "total": result["total"],
         "upgrades": [_rec_json(r) for r in result["upgrades"]],
-        "acquire": [_rec_json(r) for r in result["acquire"]],
+        "acquire": acquire,
+        "acquire_price": round(sum(r["price"] for r in acquire), 2),
     }
 
 
