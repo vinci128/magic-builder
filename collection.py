@@ -21,6 +21,7 @@ class OwnedCard:
     rarity: str = ""
     legalities: dict = field(default_factory=dict)
     image_url: str = ""
+    price_usd: float = 0.0  # non-foil USD for this printing, 0.0 when unpriced
     is_basic_filler: bool = False  # True when added as basic land padding
 
 

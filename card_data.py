@@ -1,5 +1,7 @@
 import gzip
 import json
+import re
+import threading
 import time
 from pathlib import Path
 
@@ -19,7 +21,7 @@ CACHE_TTL = 7 * 86400  # 7 days — bulk data barely changes between set release
 _PLAIN_FIELDS = (
     "id", "name", "set", "set_name", "collector_number", "color_identity",
     "type_line", "oracle_text", "keywords", "cmc", "mana_cost", "power",
-    "toughness", "rarity",
+    "toughness", "rarity", "price_usd",
 )
 # Derived keys whose stored form differs from what callers ask for.
 _SLOTS = _PLAIN_FIELDS + ("legal_formats", "image_url", "face")
@@ -155,6 +157,17 @@ def _normal_url(images: dict | None) -> str | None:
     return images.get("normal") or images.get("small") or None
 
 
+def _usd(prices: dict | None) -> float | None:
+    """Non-foil USD price as a float; None when Scryfall has no price for the printing."""
+    if not prices:
+        return None
+    raw = prices.get("usd") or prices.get("usd_foil") or prices.get("usd_etched")
+    try:
+        return float(raw) if raw else None
+    except (TypeError, ValueError):
+        return None
+
+
 def _slim(card: dict) -> CardView:
     """Drop the ~40 fields nothing in this project reads, into a CardView."""
     view = CardView()
@@ -172,6 +185,8 @@ def _slim(card: dict) -> CardView:
     view.power = _shared(card.get("power"))
     view.toughness = _shared(card.get("toughness"))
     view.rarity = _shared(card.get("rarity"))
+    # Prices repeat heavily (a few hundred distinct values across 116k printings).
+    view.price_usd = _shared(_usd(card.get("prices")))
 
     # Every consumer only ever asks whether a format is "legal", so the other
     # three states (not_legal / banned / restricted) need not be stored.
@@ -230,6 +245,43 @@ def load_scryfall_lookup() -> tuple[dict, dict]:
     return _scryfall_cache
 
 
+_by_name_cache: dict | None = None
+_by_name_lock = threading.Lock()
+
+
+def load_by_name() -> dict:
+    """Name-keyed view of the bulk data — EDHREC and decklists give names, not ids.
+
+    One entry per card name, holding the cheapest priced printing: any printing
+    plays identically, so that is the one a player would actually buy.
+    """
+    global _by_name_cache
+    if _by_name_cache is not None:
+        return _by_name_cache
+    with _by_name_lock:
+        if _by_name_cache is not None:
+            return _by_name_cache
+        by_id, _ = load_scryfall_lookup()
+        index: dict = {}
+        for card in by_id.values():
+            key = name_key(card.name)
+            current = index.get(key)
+            if current is None:
+                index[key] = card
+                continue
+            price, best = card.price_usd, current.price_usd
+            if price and (not best or price < best):
+                index[key] = card
+        _by_name_cache = index
+    return _by_name_cache
+
+
+def name_key(name: str) -> str:
+    """Match Scryfall and EDHREC spellings: front face only, casing/punctuation ignored."""
+    front = (name or "").split("//")[0]
+    return re.sub(r"[^a-z0-9 ]", "", front.lower()).strip()
+
+
 def enrich_collection(owned_cards: list, scryfall_lookup: dict):
     """Attach Scryfall metadata to each owned card in-place."""
     missing = 0
@@ -252,5 +304,6 @@ def enrich_collection(owned_cards: list, scryfall_lookup: dict):
         card.rarity = data.get("rarity", "")
         card.legalities = data.get("legalities", {})
         card.image_url = data.get("image_uris") or front.get("image_uris") or ""
+        card.price_usd = data.get("price_usd") or 0.0
     if missing:
         print(f"  Warning: {missing} card(s) not found in Scryfall data (may be very new prints).")
