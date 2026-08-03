@@ -13,9 +13,12 @@ venv/
 deck_output.txt
 deck_output.decklist.txt
 
-# Personal collection CSV (potentially private)
-# Remove this line if you want to include your collection
+# Personal collection files (potentially private)
+# Remove these lines if you want to include your collection
 ManaBox_Collection.csv
+collection_from_logs.csv
+collection*.csv
+*_collection.csv
 
 # Env / secrets
 .env
