@@ -1,17 +1,24 @@
 """Commander bracket (1-5) estimation for a built singleton deck.
 
 The bracket system is WotC's shared vocabulary for how hard a Commander deck is
-trying. Each bracket publishes what a deck may contain, so this module tests
-those restrictions and reports the lowest bracket the deck still fits:
+trying. Each bracket pairs an expected game length with a list of what a deck
+may contain, so this module tests those restrictions and reports the lowest
+bracket the deck still fits:
 
-    1 Exhibition  no Game Changers, no mass land denial, no extra-turn cards,
-                  no two-card infinite combos
-    2 Core        as above, but a few extra-turn cards are fine so long as they
-                  are not chained
-    3 Upgraded    up to 3 Game Changers, no mass land denial, no chained extra
-                  turns, and any two-card combo must be a late-game one
-    4 Optimized   no restrictions
-    5 cEDH        no restrictions, plus intent to compete in a tournament meta
+    1 Exhibition  9+ turns.  No Game Changers, no mass land denial, no
+                  extra-turn cards, no two-card infinite combos
+    2 Core        8+ turns.  As above, but a few extra-turn cards are fine so
+                  long as they are not chained
+    3 Upgraded    6+ turns.  Up to 3 Game Changers, no mass land denial, no
+                  chained extra turns, and any two-card combo must be late-game
+    4 Optimized   4+ turns.  No restrictions
+    5 cEDH        Any turn.  No restrictions, plus intent to compete in a
+                  tournament metagame
+
+Current as of the February 9, 2026 beta update. The turn expectations, and the
+removal of the tutor guiderails, came in the October 21, 2025 update; February
+2026 changed only the Game Changers list, which we read from Scryfall and so
+never have to track by hand.
 
 Why the floor is 2, not 1
 -------------------------
@@ -20,24 +27,31 @@ Two of the five brackets are never assigned here, for the same reason: they say
 
 Bracket 5 is the obvious one — only a tournament mindset separates it from 4.
 Bracket 1 is the subtler one. Exhibition is not "a deck that happens to break
-none of the rules": WotC describes it as ultra-casual, theme chosen before
-power, with games expected to run nine turns or more. Every preconstructed deck
-clears bracket 1's restriction list — precons carry no Game Changers, no land
-denial, no extra turns and no combos — and yet WotC's own yardstick is that the
-average precon is a Core (2) deck. So the restrictions cannot tell 1 from 2, and
-a classifier that stops at the first list a deck satisfies labels every clean
-deck an Exhibition deck, which is how three bracket-2 precons all came out as 1.
+none of the rules": it is the bracket for a deck whose theme was chosen ahead of
+its power, expecting games to run nine turns or more. Nearly every casual deck
+ever built clears bracket 1's restriction list without being an Exhibition deck
+— every precon does, which is how three bracket-2 precons all came out as 1
+here. The restrictions simply do not separate 1 from 2, so a classifier that
+stops at the first list a deck satisfies calls every clean deck an Exhibition
+deck. The other tools reach the same conclusion from the other end: automatic
+detection on Moxfield and Archidekt effectively never assigns a 1.
 
-The floor is therefore 2. When a deck also clears bracket 1's stricter rules
-that is reported as a note the pilot may claim, not as a verdict.
+The floor is therefore 2, which is also the wider target it now has to be: the
+October 2025 update cut the "average preconstructed deck" wording from Core and
+opened the bracket to upgraded and semi-tuned decks as well. When a deck also
+clears bracket 1's stricter rules that is reported as a note the pilot may
+claim, not as a verdict.
 
-Above the precon baseline
--------------------------
-The same "lowest list that fits" rule under-reads decks the other way: a deck
-with fast mana and a pile of one-mana answers but no Game Changer is a 2 by the
-letter of the rules, and plainly not a precon-level deck at a table.
-`_tuning_signals` looks for that, and adds an advisory criterion. It does not
-move the number — the number stays the published, checkable one.
+How fast it wins
+----------------
+The "lowest list that fits" rule under-reads decks the other way: a deck with
+fast mana and a pile of one-mana answers but no Game Changer is a 2 by the
+letter of the restrictions while being able to close a game well before the
+eighth turn that bracket 2 asks for. Since October 2025 that game length is the
+framework's headline expectation, not a footnote, so `_speed_signals` looks for
+the things that shorten a game — cheap mana, free interaction, a low curve — and
+adds an advisory criterion. It does not move the number: the number stays the
+published, checkable one, and the speed read is offered next to it.
 
 Where the numbers come from
 ---------------------------
@@ -54,8 +68,9 @@ Game Changers (already counted above) and that a pile of inefficient ones does
 not warp a table. They are still counted here, as context only.
 
 The thresholds below (how many extra turns stop being "low quantities", what
-counts as above-precon tuning) are this module's own reading — WotC gives those
-limits in words, not numbers.
+counts as a fast deck) are this module's own reading — WotC gives those limits
+in words, not numbers, and says outright that breaking an expectation once does
+not put a deck in another bracket.
 """
 
 import re
@@ -72,16 +87,20 @@ BRACKET_NAMES = {
 }
 
 BRACKET_BLURBS = {
-    1: "Ultra-casual: a theme deck built to show off, with games running 9+ turns.",
-    2: "The classic casual Commander experience — a real strategy winning around turn 8 or later.",
-    3: "Upgraded: tuned past precon strength, with a late-game plan to win.",
-    4: "Optimized: the strongest build of its idea, short of tournament play.",
-    5: "cEDH: built to beat the tournament metagame, not just to be powerful.",
+    1: "Ultra-casual: theme chosen ahead of power, with games running 9+ turns.",
+    2: "The classic casual game — a real strategy, winning on turn 8 or later.",
+    3: "Upgraded: strong synergy and card quality, winning from turn 6.",
+    4: "Optimized: lethal, fast and consistent, winning from turn 4.",
+    5: "cEDH: built to beat the tournament metagame, and can win on any turn.",
 }
+
+# The turn each bracket expects a game to last at least this long, from the
+# October 2025 update. Bracket 5 has none: those games can end on any turn.
+BRACKET_TURNS = {1: 9, 2: 8, 3: 6, 4: 4}
 
 MAX_GAME_CHANGERS_B3 = 3   # published: bracket 3 allows up to three
 MAX_EXTRA_TURNS_B3 = 3     # our reading of "low quantities" — more is a plan
-TUNING_SIGNALS_ABOVE_B2 = 2  # how many tuning signals read as "past precon"
+SPEED_SIGNALS_FAST = 2     # how many speed signals read as "ends games early"
 
 
 # ── Card-level detectors ─────────────────────────────────────────────────────
@@ -121,10 +140,10 @@ _LAND_FETCH_RE = re.compile(
     r"\b(land|lands|basic|plains|island|swamp|mountain|forest|gate)\b"
 )
 
-# ── Tuning signals (not part of the published rules; see the module docstring) ─
+# ── Speed signals (our own reading; see the module docstring) ────────────────
 
-# Fast mana that a precon would not ship. Sol Ring is deliberately absent: it is
-# in nearly every precon, so it says nothing about a deck being tuned past one.
+# Fast mana. Sol Ring is deliberately absent: it is in nearly every deck ever
+# assembled, so its presence says nothing about how fast this one is.
 _FAST_MANA = frozenset((
     "mana vault", "grim monolith", "chrome mox", "mox diamond", "mox opal",
     "mox amber", "mox tantalite", "lotus petal", "jeweled lotus", "lion's eye diamond",
@@ -141,17 +160,17 @@ _FREE_SPELL_RE = re.compile(
     r"rather than pay (this spell's|its) mana cost"
 )
 
-# One- and two-mana answers. Density of these is what separates a tuned deck
-# from a precon far more reliably than any single card does.
+# One- and two-mana answers. A deck that can answer cheaply protects a fast win
+# and survives to take one; the density of them says more than any single card.
 _INTERACTION_RE = re.compile(
     r"counter target|destroy target|exile target|"
     r"sacrifices? a (creature|permanent)|return target .{0,20}to its owner's hand"
 )
 
-MIN_FAST_MANA_TUNED = 2
-MIN_FREE_SPELLS_TUNED = 2
-MIN_CHEAP_ANSWERS_TUNED = 8
-MAX_AVG_MV_TUNED = 2.6      # precons sit near 3.3
+MIN_FAST_MANA_FAST = 2
+MIN_FREE_SPELLS_FAST = 2
+MIN_CHEAP_ANSWERS_FAST = 8
+MAX_AVG_MV_FAST = 2.6       # a bracket 2 deck usually sits above 3
 
 
 def _text(card) -> str:
@@ -208,28 +227,28 @@ def _avg_mana_value(cards: list) -> float:
     return sum(c.cmc for c in spells) / len(spells) if spells else 0.0
 
 
-def _tuning_signals(cards: list) -> list:
-    """Ways this deck reads as tuned past the precon baseline that defines a 2.
+def _speed_signals(cards: list) -> list:
+    """Ways this deck reads as able to end a game early.
 
     None of these are in the published rules — see the module docstring. Each is
     a whole-deck density rather than a single card, because one Mana Vault does
-    not make a deck strong and eight one-mana answers do.
+    not make a deck fast and eight one-mana answers do.
     """
     signals = []
     fast = [c.name for c in cards if is_fast_mana(c)]
-    if len(fast) >= MIN_FAST_MANA_TUNED:
+    if len(fast) >= MIN_FAST_MANA_FAST:
         signals.append("fast mana: " + ", ".join(sorted(set(fast))))
 
     free = [c.name for c in cards if is_free_spell(c)]
-    if len(free) >= MIN_FREE_SPELLS_TUNED:
+    if len(free) >= MIN_FREE_SPELLS_FAST:
         signals.append("free spells: " + ", ".join(sorted(set(free))))
 
     answers = [c for c in cards if is_cheap_answer(c)]
-    if len(answers) >= MIN_CHEAP_ANSWERS_TUNED:
+    if len(answers) >= MIN_CHEAP_ANSWERS_FAST:
         signals.append(f"{len(answers)} one- or two-mana instant-speed answers")
 
     avg = _avg_mana_value(cards)
-    if avg and avg <= MAX_AVG_MV_TUNED:
+    if avg and avg <= MAX_AVG_MV_FAST:
         signals.append(f"average mana value {avg:.1f}")
     return signals
 
@@ -285,9 +304,8 @@ def _criteria(cards: list, combos) -> list:
         Criterion(
             "tutors", "Tutors", len(tutors), names(tutors),
             "None." if not tutors else
-            f"{len(tutors)} — tutors stopped restricting brackets in the "
-            "October 2025 update; the efficient ones are Game Changers "
-            "and already counted above.",
+            "Tutors stopped restricting brackets in the October 2025 update; "
+            "the efficient ones are Game Changers, and already counted above.",
         ),
     ]
 
@@ -313,14 +331,16 @@ def _criteria(cards: list, combos) -> list:
              f"{len(two)}, all late-game — allowed from bracket 3 up."),
         ))
 
-    signals = _tuning_signals(cards)
+    # Speed is context at every bracket, so this note stays bracket-neutral; the
+    # comparison against a bracket's expected game length lives in `_notes`,
+    # which knows which bracket the deck landed in.
+    signals = _speed_signals(cards)
     out.append(Criterion(
-        "tuning", "Above precon baseline", len(signals), signals,
-        "None — this plays at the precon level bracket 2 describes."
-        if not signals else
-        "One sign of tuning, which a bracket 2 deck can carry."
-        if len(signals) < TUNING_SIGNALS_ABOVE_B2 else
-        "Reads as tuned past precon strength, whatever the restrictions allow.",
+        "speed", "Deck speed", len(signals), signals,
+        "Nothing here rushes a game." if not signals else
+        "One sign of speed, which any bracket carries fine."
+        if len(signals) < SPEED_SIGNALS_FAST else
+        "Built to close games early, whatever the restrictions allow.",
     ))
     return out
 
@@ -329,8 +349,8 @@ def _bracket_from(criteria: dict, combos) -> tuple[int, list]:
     """Lowest bracket the deck fits, plus the reasons it cannot go lower.
 
     The floor is 2, never 1: see the module docstring — bracket 1 is a claim
-    about intent, and a deck that satisfies its restrictions is usually just a
-    precon-level deck.
+    about intent, and a deck that satisfies its restrictions is usually just an
+    ordinary casual deck.
     """
     game_changers = criteria["game_changers"].count
     land_denial = criteria["land_denial"].count
@@ -393,20 +413,22 @@ def evaluate(commander, deck: list, combos=None, *, fmt: str = "commander") -> d
     criteria = _criteria(cards, combos)
     by_key = {c.key: c for c in criteria}
     number, blockers = _bracket_from(by_key, combos)
-    tuned = by_key["tuning"].count >= TUNING_SIGNALS_ABOVE_B2
-    exhibition_ok = number == 2 and _exhibition_ok(by_key, combos)
+    fast = by_key["speed"].count >= SPEED_SIGNALS_FAST
+    # A deck built to close games early is not an Exhibition deck under any
+    # reading, so the two notes are never offered together.
+    exhibition_ok = number == 2 and not fast and _exhibition_ok(by_key, combos)
 
     # `reason` stands alone for callers that have already named the bracket
     # (the CLI block, the scale in the web UI); `headline` is the full sentence.
     if blockers:
         reason = "held there by " + _join(blockers)
-    elif tuned:
-        reason = ("no Game Changers, no land denial and no combos, but it is "
-                  "built well past precon strength")
+    elif fast:
+        reason = ("no Game Changers, no land denial and no combos, but built to "
+                  f"win before the turn {BRACKET_TURNS[2]} this bracket expects")
     else:
         reason = ("no Game Changers, no land denial, no combos — the classic "
-                  "casual Commander level Core (2) describes, where most "
-                  "precons play")
+                  f"casual game Core (2) describes, decided on turn "
+                  f"{BRACKET_TURNS[2]} or later")
     headline = f"{BRACKET_NAMES[number]} ({number}) — {reason}."
 
     unchecked = [c for c in criteria if c.unchecked]
@@ -426,30 +448,32 @@ def evaluate(commander, deck: list, combos=None, *, fmt: str = "commander") -> d
         # A deck can always be played *up*, and brackets 1 and 5 are statements
         # of intent that no decklist can settle.
         "exhibition_ok": exhibition_ok,
-        "tuned_past_precon": tuned,
+        "fast_for_bracket": fast,
         "notes": _notes(number, unchecked, fmt,
-                        exhibition_ok=exhibition_ok, tuned=tuned),
+                        exhibition_ok=exhibition_ok, fast=fast),
     }
 
 
 def _notes(number: int, unchecked: list, fmt: str, *,
-           exhibition_ok: bool = False, tuned: bool = False) -> list:
+           exhibition_ok: bool = False, fast: bool = False) -> list:
     notes = []
     if unchecked:
         notes.append(
             "Two-card combos weren't checked, so the real bracket may be higher."
         )
-    if tuned and number == 2:
+    if fast and number == 2:
         notes.append(
-            "The restrictions put this at 2, but it plays above the precon "
-            "baseline — pitch it as a 3 and nobody at the table will be surprised."
+            f"The restrictions put this at 2, but bracket 2 expects games to "
+            f"reach turn {BRACKET_TURNS[2]} and this deck is built to end one "
+            f"sooner — pitch it as a 3 (turn {BRACKET_TURNS[3]}+) and nobody at "
+            "the table will be surprised."
         )
     if exhibition_ok:
         notes.append(
-            "It clears bracket 1's stricter rules too, but Exhibition means a "
-            "deck built around a theme rather than winning, with games running "
-            "nine turns or more — call it a 1 only if that's what it's for. "
-            "The average precon is a 2, and so is this."
+            "It clears bracket 1's stricter rules too, but Exhibition is for a "
+            "deck whose theme was chosen ahead of its power, with games running "
+            f"{BRACKET_TURNS[1]} turns or more — call it a 1 only if that's what "
+            "it's for. Bracket 2 is where an ordinary casual deck belongs."
         )
     if number == 4:
         notes.append(
