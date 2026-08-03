@@ -62,6 +62,10 @@ python main.py ManaBox_Collection.csv --output my_deck.txt
 # Skip the EDHREC lookup (fully offline once the card database is cached)
 python main.py ManaBox_Collection.csv --no-recs
 
+# Build to a Commander bracket: keeps out what the bracket disallows, and
+# for bracket 3 puts in the Game Changers that are what reach it
+python main.py ManaBox_Collection.csv --target-bracket 3
+
 # Build a 60-card Standard deck from an Arena collection (auto-picks colors)
 python main.py collection_from_logs.csv --format standard
 
@@ -81,17 +85,26 @@ Output is printed to the console and saved as:
 
 ## Commander brackets
 
-Every Commander and Brawl deck is scored against WotC's bracket scale — 1 Exhibition, 2 Core, 3 Upgraded, 4 Optimized, 5 cEDH — and reported with the cards that decided it. A deck's bracket is the lowest one whose restrictions it satisfies, so the panel shows all five criteria and marks the ones that fired:
+Every Commander and Brawl deck is scored against WotC's bracket scale — 1 Exhibition, 2 Core, 3 Upgraded, 4 Optimized, 5 cEDH — and reported with the cards that decided it. Each bracket pairs an expected game length (9+, 8+, 6+, 4+ turns, then any) with a list of what a deck may contain, so the panel shows every criterion and marks the ones that fired:
 
 | Criterion | Source |
 | --- | --- |
 | Game Changers | Scryfall's `game_changer` field — WotC's published list, so this one is exact |
-| Mass land denial | Rules-text detection (`brackets.py`), matching sweeps and lock pieces but not spot land removal |
+| Mass land denial | Rules-text detection (`brackets.py`), matching sweeps and standing locks but not spot land removal, one-off symmetric sacrifices, or wipes that spare lands |
 | Extra turns | Rules-text detection, separating one-shot spells from permanents that repeat |
-| Tutors | Rules-text detection, excluding land fetch |
+| Tutors | Rules-text detection, excluding land fetch — context only, see below |
 | Two-card infinite combos | [Commander Spellbook](https://commanderspellbook.com), which classifies each combo as two-card and reports how early it can go off |
+| Deck speed | Fast mana, free spells, cheap interaction and curve — this project's reading, advisory only |
 
-Two limits worth knowing. **Bracket 5 is never assigned**: nothing in a decklist separates cEDH from Optimized — it is a claim about the metagame the deck was built for, which only its pilot can make. And the **tutor thresholds are this project's reading**, not a published number: WotC says bracket 1 runs none and bracket 2 "a small number", so tutoring only ever decides 1-vs-2 here.
+Current as of WotC's **February 9, 2026** beta update. The turn expectations arrived in the October 21, 2025 update, which also **removed the tutor guiderails from every bracket** — the efficient tutors are Game Changers and already counted, so tutors are reported here as context and gate nothing.
+
+Three limits worth knowing:
+
+- **Bracket 5 is never assigned.** Nothing in a decklist separates cEDH from Optimized — it is a claim about the metagame the deck was built for, which only its pilot can make.
+- **Bracket 1 is never assigned either, and 2 is the floor.** Exhibition is a deck whose theme was chosen ahead of its power. Nearly every casual deck clears its restriction list without being one — every precon does — so a classifier that stops at the first list a deck satisfies calls every clean deck a 1. When a deck also clears bracket 1's stricter rules, that is offered as a note rather than a verdict. Moxfield and Archidekt land in the same place: their automatic detection effectively never assigns a 1.
+- **Deck speed does not move the number.** The published restrictions decide the bracket; the speed read sits next to it, because a deck with fast mana and eight one-mana answers but no Game Changer is a 2 by the letter of the rules while being able to end a game well before the turn 8 that bracket asks for.
+
+`--target-bracket N` builds to a bracket instead of reporting one. It keeps out what that bracket disallows (Game Changers below 3, mass land denial and chained extra turns below 4) and seeds in the Game Changers that reach 3 and above — synergy scoring alone never picks them, since Farewell shares nothing with an Elemental commander. Two-card combos depend on which pairs end up together and are only known once Spellbook has answered, so they are reported against the target rather than built around, and the CLI says so when they push a deck past what you asked for.
 
 The combo check is the only part that needs the network. The CLI skips it under `--no-recs`, and the web UI renders the bracket immediately from the local criteria and refines it when Spellbook answers. Either way an unchecked combo criterion is reported as unchecked rather than as clean, since a missed combo can only mean the real bracket is *higher*. Responses are cached under `.cache/combos/` for a week, keyed by deck contents.
 

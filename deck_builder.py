@@ -1,6 +1,7 @@
 from typing import NamedTuple
 
 import archetype
+import brackets
 import formats
 from collection import OwnedCard
 
@@ -324,12 +325,77 @@ def _optimal_basics(ci: set, non_land_deck: list, count: int) -> list:
     return basics[:count]
 
 
+# ── Building to a bracket ────────────────────────────────────────────────────
+
+def _bracket_pool(pool: list, commander: OwnedCard, target: int) -> tuple[list, list]:
+    """Trim `pool` to what a deck aiming at bracket `target` may contain.
+
+    Returns the trimmed pool and the Game Changers to seed into it. Seeding is
+    the half that is easy to forget: brackets 1 and 2 are reached by leaving
+    cards out, but 3 is reached by putting them in — a deck with no Game Changer
+    and no combo is a 2 however carefully it was built.
+
+    Only the card-level criteria are decided here. Two-card combos depend on
+    which pairs end up together and are only known once Commander Spellbook has
+    answered, so `main.py` reports them against the target rather than building
+    around them.
+    """
+    def best(cards: list, limit: int) -> list:
+        return sorted(cards, key=lambda c: synergy_score(c, commander),
+                      reverse=True)[:limit]
+
+    if target >= 4:
+        # Nothing above 3 restricts what a deck may contain, so nothing is
+        # trimmed. The Game Changers are still seeded: "bring out your strongest
+        # cards" is the whole of bracket 4, and the synergy score never picks
+        # them on its own.
+        game_changers = [c for c in pool if brackets.is_game_changer(c)]
+        return pool, best(game_changers, len(game_changers))
+
+    keep, game_changers, extra_turns = [], [], []
+    for card in pool:
+        # Never allowed below 4, at any of the lower brackets.
+        if brackets.is_mass_land_denial(card) or brackets.is_chainable_extra_turn(card):
+            continue
+        if brackets.is_game_changer(card):
+            game_changers.append(card)
+        elif brackets.is_extra_turn(card):
+            extra_turns.append(card)
+        else:
+            keep.append(card)
+
+    # Bracket 3 may run up to three Game Changers; 1 and 2 may run none.
+    seeds = best(game_changers, brackets.MAX_GAME_CHANGERS_B3) if target == 3 else []
+    # Bracket 1 allows no extra-turn cards at all; 2 and 3 want low quantities.
+    turns = [] if target == 1 else best(extra_turns, brackets.MAX_EXTRA_TURNS_B3)
+    return keep + seeds + turns, seeds
+
+
+def _seeded_first(scored: list, seeds: list) -> list:
+    """Move `seeds` to the front of an already-scored list.
+
+    The deck is assembled lands-first and truncated from the end, so a card at
+    the front of its list is one that survives. Game Changers score no synergy
+    points — Farewell shares nothing with an Elemental commander — and would
+    otherwise lose every slot to a card that happens to be the right creature
+    type.
+    """
+    names = {c.name for c in seeds}
+    return seeds + [c for c in scored if c.name not in names]
+
+
 # ── Main deck-builder ────────────────────────────────────────────────────────
 
-def build_deck(commander: OwnedCard, owned_cards: list, fmt: str = "commander") -> list:
+def build_deck(commander: OwnedCard, owned_cards: list, fmt: str = "commander",
+               target_bracket: int | None = None) -> list:
     """Build the singleton deck behind `commander` (Commander or Brawl).
 
     Both formats are 1 commander + 99, so only the legality key differs.
+
+    `target_bracket` builds to a Commander bracket: it keeps out what that
+    bracket does not allow, and for bracket 3 seeds in the Game Changers that
+    are what put a deck there. Default None builds the strongest deck it can
+    and lets the bracket fall where it falls.
     """
     spec = formats.get(fmt)
     if not spec.singleton:
@@ -347,11 +413,21 @@ def build_deck(commander: OwnedCard, owned_cards: list, fmt: str = "commander") 
         and not _is_basic_land(c)
     ]
 
+    seeds: list = []
+    if target_bracket is not None:
+        pool, seeds = _bracket_pool(pool, commander, target_bracket)
+
     non_basic_lands = [c for c in pool if _is_land(c)]
     non_lands = [c for c in pool if not _is_land(c)]
 
     scored_non_lands  = sorted(non_lands,       key=lambda c: synergy_score(c, commander), reverse=True)
     scored_lands      = sorted(non_basic_lands, key=lambda c: synergy_score(c, commander), reverse=True)
+
+    # A seeded Game Changer can be a land (Gaea's Cradle) or not (Farewell), so
+    # each goes to the front of its own list and the land maths below is unmoved.
+    if seeds:
+        scored_non_lands = _seeded_first(scored_non_lands, [c for c in seeds if not _is_land(c)])
+        scored_lands     = _seeded_first(scored_lands,     [c for c in seeds if _is_land(c)])
 
     # Commander is singleton: a second printing of a card is still a duplicate,
     # so reserve by name rather than by Scryfall id.
