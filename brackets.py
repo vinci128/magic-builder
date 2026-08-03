@@ -112,16 +112,37 @@ SPEED_SIGNALS_FAST = 2     # how many speed signals read as "ends games early"
 # takes lands along with everything else counts (Jokulhaups: "destroy all
 # artifacts, creatures, and lands"), while one that spares them does not
 # ("destroy all nonland permanents" — `\blands\b` will not match "nonland").
+# The symmetric sacrifices need a quantity, for the same reason spot removal is
+# absent: "each player sacrifices a land" once (Hurloon Shaman, Tremble) costs
+# everyone the same single land and locks nobody out of the game. It becomes
+# denial when it takes several at once, scales with something, or repeats.
 _MLD_PATTERNS = (
     r"(destroy|exile|return) all [^.]{0,40}\blands\b",
-    r"each (player|opponent) sacrifices \w+ lands?",
-    r"\blands don't untap",
-    r"permanents don't untap",
+    r"each (player|opponent) sacrifices (two|three|four|five|six|seven|all|half|x|\d+) lands?",
+    r"each (player|opponent) sacrifices [^.]{0,40}lands?[^.]{0,25}for each",
+    r"upkeep, (that|each) player sacrifices a land",  # Mana Vortex — a lock
+    # The lock has to be the standing kind. "During their controllers' untap
+    # steps" is Winter Orb and Static Orb; "during its controller's *next*
+    # untap step" is one tapped permanent for one turn, which is not denial.
+    r"\blands don't untap during their controllers' untap steps",
+    r"permanents don't untap during their controllers' untap steps",
+    # The same standing lock under newer templating: Winter Orb and Static Orb
+    # were re-worded to "can't untap more than", and Stasis skips the step
+    # outright. Counting these is consistent with counting Hokori above.
+    r"players can't untap more than \w+ (land|permanent)",
+    r"players skip their untap steps",
 )
 _MLD_RE = re.compile("|".join(_MLD_PATTERNS))
 
 # "Destroy all permanents" (Obliterate) names no land but takes every one.
 _WIPE_INCLUDES_LANDS = re.compile(r"(destroy|exile) all permanents")
+
+# A sweep that mentions lands only to spare them is the opposite of land
+# denial: Scourglass ("except for artifacts and lands"), Elspeth Tirel
+# ("except for lands and tokens"), Embargo ("Nonland permanents don't untap").
+_SPARES_LANDS = re.compile(
+    r"except for [^.]{0,30}lands|(nonland|snow) permanents don't untap"
+)
 
 _EXTRA_TURN_RE = re.compile(r"takes? an extra turn|take an extra turn after this one")
 
@@ -183,6 +204,8 @@ def is_game_changer(card) -> bool:
 
 def is_mass_land_denial(card) -> bool:
     t = _text(card)
+    if _SPARES_LANDS.search(t):
+        return False
     return bool(_MLD_RE.search(t) or _WIPE_INCLUDES_LANDS.search(t))
 
 
