@@ -40,6 +40,12 @@ Export your collection from ManaBox as a CSV and place it in the project directo
 
 On its first run the builder downloads Scryfall's bulk card database (~80 MB gzipped) into `.cache/` and refreshes it weekly. Everything after that is local except the EDHREC lookup.
 
+## Automatic Arena collection scrape
+
+`scrape_collection.py` regenerates `collection_from_logs.csv` from MTG Arena's `Player.log` (Steam/Proton install, app ID 2141910). Arena no longer logs the full collection, so the scraper takes the union of all deck contents (max quantity per card across decks — starter/precon cards count as owned) from the login account payload, and resolves card ids to name/set/collector number via Arena's own card database (`Raw_CardDatabase_*.mtga`). Requires **Detailed Logs (Plugin Support)** enabled in Arena's Account options.
+
+It runs automatically: the `mtga-collection.path` systemd user unit (`~/.config/systemd/user/`) watches `Player.log` and triggers `mtga-collection.service` after each Arena session. Run manually with `python3 scrape_collection.py`; it only rewrites the CSV when the collection changed.
+
 ## Usage
 
 ```bash
@@ -154,6 +160,7 @@ magic_builder/
 ├── main.py              # CLI entry point (click)
 ├── collection.py        # ManaBox CSV parser → OwnedCard objects
 ├── arena_collection.py  # Arena export + Player.log CSV parsers, format detection
+├── scrape_collection.py # Player.log → collection_from_logs.csv (auto-run by systemd)
 ├── card_data.py         # Scryfall bulk data download + enrichment (.cache/*.jsonl.gz)
 ├── formats.py           # Format specs: legality key, deck size, copy cap, sideboard
 ├── archetype.py         # Colour-combo names (Azorius, Jund...) and deck naming
