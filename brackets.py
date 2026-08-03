@@ -423,11 +423,16 @@ def _exhibition_ok(criteria: dict, combos) -> bool:
             and not combos.two_card)
 
 
-def evaluate(commander, deck: list, combos=None, *, fmt: str = "commander") -> dict:
+def evaluate(commander, deck: list, combos=None, *, fmt: str = "commander",
+             target: int | None = None) -> dict:
     """Estimate the bracket of `deck`, with the evidence behind it.
 
     `combos` is a `combos.ComboResult`, or None when the lookup was skipped;
     either way the criterion is reported as unchecked rather than as clean.
+
+    `target` is the bracket the deck was *built* for, when it was built for one.
+    It changes nothing about the estimate — it only adds a `target` block saying
+    whether the build got there, so the CLI and the web UI say the same thing.
     """
     cards = [c for c in deck if not c.is_basic_filler]
     if commander is not None:
@@ -455,7 +460,7 @@ def evaluate(commander, deck: list, combos=None, *, fmt: str = "commander") -> d
     headline = f"{BRACKET_NAMES[number]} ({number}) — {reason}."
 
     unchecked = [c for c in criteria if c.unchecked]
-    return {
+    result = {
         "number": number,
         "name": BRACKET_NAMES[number],
         "label": f"{BRACKET_NAMES[number]} ({number})",
@@ -475,6 +480,8 @@ def evaluate(commander, deck: list, combos=None, *, fmt: str = "commander") -> d
         "notes": _notes(number, unchecked, fmt,
                         exhibition_ok=exhibition_ok, fast=fast),
     }
+    result["target"] = _target_outcome(target, result) if target else None
+    return result
 
 
 def _notes(number: int, unchecked: list, fmt: str, *,
@@ -509,6 +516,79 @@ def _notes(number: int, unchecked: list, fmt: str, *,
             f"{fmt.title()}, which has its own card pool and ban list."
         )
     return notes
+
+
+def _target_outcome(target: int, result: dict) -> dict:
+    """Whether a build aimed at bracket `target` got what it asked for.
+
+    The builder controls the card-level criteria, so it either hits the target
+    or is stopped by something it could not put in the deck — a Game Changer
+    the collection does not hold — or by something it could not see coming,
+    which in practice means a two-card combo.
+    """
+    got = result["number"]
+    name = BRACKET_NAMES[target]
+    crit = {c["key"]: c for c in result["criteria"]}
+    unchecked = crit["combos"]["unchecked"]
+    caveat = ("" if not unchecked else
+              " Two-card combos weren't checked, so this is the card-level"
+              " answer only.")
+
+    if target == 1:
+        # We floor at 2, so a bracket 1 request can only ever be honoured as a
+        # constraint on what went in — the label itself is the pilot's to claim.
+        # That constraint is card-level, so it holds whether or not the combo
+        # lookup ran, unlike `exhibition_ok`.
+        if got == 2 and not crit["extra_turns"]["count"] and not crit["combos"]["count"]:
+            return _outcome(target, True,
+                            "Built inside Exhibition's restrictions — no Game Changers, "
+                            "no land denial, no extra turns, no combos. It is reported as "
+                            "2 because Exhibition is a claim about why a deck was built, "
+                            "which a decklist cannot make for you." + caveat)
+        return _outcome(target, False,
+                        f"Missed — the deck came out as {result['label']}, "
+                        f"{result['reason']}.")
+
+    if got == target:
+        return _outcome(target, True, f"Met — {result['reason']}.{caveat}")
+
+    if got > target:
+        return _outcome(target, False,
+                        f"Missed — the deck came out as {result['label']}, "
+                        f"{result['reason']}. The builder keeps out what a bracket "
+                        f"disallows card by card, but two-card combos only show up once "
+                        f"the pairs are together, so they can still push a deck past "
+                        f"its target.")
+
+    # got < target: the collection had nothing left to climb with. Every deck
+    # is welcome at a table above its own bracket, so this is not an error.
+    gc = crit["game_changers"]["count"]
+    owned_gc = f"{gc} Game Changer" + ("" if gc == 1 else "s")
+    if target == 3:
+        why = (f"it runs {owned_gc}, and "
+               + ("the combo database wasn't reached" if unchecked else
+                  "no two-card combo turned up")
+               + " — bracket 3 needs one or the other")
+    else:
+        tier = "bracket 5 is" if target == 5 else f"brackets {target} and up are"
+        why = (f"it runs {owned_gc} and nothing else in these colours pushes it "
+               f"higher; {tier} reached by playing stronger cards than the "
+               f"collection holds")
+    return _outcome(target, False,
+                    f"Not reached — the deck is {result['label']}, because {why}. "
+                    f"Play it a bracket up if the table wants to.")
+
+
+def _outcome(target: int, met: bool, report: str) -> dict:
+    return {
+        "number": target,
+        "name": BRACKET_NAMES[target],
+        "met": met,
+        "report": report,
+        # The one-line form the CLI prints, and the UI's accessible label.
+        "line": f"Target bracket {target} ({BRACKET_NAMES[target]}): "
+                f"{report[0].lower()}{report[1:]}",
+    }
 
 
 def _join(items: list) -> str:

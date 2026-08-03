@@ -311,6 +311,48 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .color-btn[aria-pressed="true"] { color: var(--ink); border-color: var(--brass); }
 
+/* ── Target bracket ───────────────────────────────────────────────────── */
+
+.target { margin-top: 16px; border-top: 1px solid var(--rule-soft); padding-top: 14px; }
+
+.target-label {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 8px;
+}
+
+/* "Any" carries a word and the rest carry a digit, so the first cell is left
+   to size itself and the numbers share what is left evenly. */
+.bracket-picker {
+  display: grid;
+  grid-template-columns: auto repeat(5, 1fr);
+  gap: 2px;
+  background: var(--rule-soft);
+  border-radius: var(--radius);
+  padding: 2px;
+  margin-bottom: 10px;
+}
+
+.bracket-btn {
+  background: none;
+  border: 0;
+  border-radius: 2px;
+  padding: 7px 10px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.bracket-btn.is-on {
+  background: var(--raised);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+
+.target .pane-note { margin-bottom: 0; font-size: 11.5px; }
+
 /* ── Commander candidate list ─────────────────────────────────────────── */
 
 .cmd-list {
@@ -674,6 +716,20 @@ button { font: inherit; color: inherit; cursor: pointer; }
   border-top: 1px solid var(--rule-soft);
   padding-top: 10px;
 }
+
+/* The verdict on a deck that was built for a bracket. Brass for a target that
+   was hit, alert for one that was not — the same two colours the rest of the
+   page already uses for "as asked" and "look here". */
+.bracket-target {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  border-left: 2px solid var(--brass);
+  padding-left: 10px;
+}
+
+.bracket-target[data-met="false"] { border-left-color: var(--alert); }
 
 @media (max-width: 720px) {
   .bracket-body { grid-template-columns: minmax(0, 1fr); }

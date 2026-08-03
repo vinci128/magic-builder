@@ -19,7 +19,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import brackets
 import combos
@@ -276,7 +276,7 @@ def _standard_synergy(pairs: list) -> dict:
 
 def _deck_payload(pairs: list, *, colors: set, pretty: str, decklist: str,
                   fmt: str, archetype: str, sideboard: list | None = None,
-                  commander=None) -> dict:
+                  commander=None, target_bracket: int | None = None) -> dict:
     """pairs: list of (OwnedCard, count) for the main deck."""
     if commander is not None:
         synergy, reasons_by_name = _commander_synergy(pairs, commander)
@@ -300,7 +300,7 @@ def _deck_payload(pairs: list, *, colors: set, pretty: str, decklist: str,
     bracket = None
     if commander is not None and formats.get(fmt).singleton:
         bracket = brackets.evaluate(commander, [card for card, _ in pairs],
-                                    None, fmt=fmt)
+                                    None, fmt=fmt, target=target_bracket)
 
     total = sum(count for _, count in pairs) + (1 if commander else 0)
     side = [_card_json(card, count) for card, count in (sideboard or [])]
@@ -427,6 +427,8 @@ def list_commanders(sid: str, limit: int = 24, edhrec: bool = False, fmt: str = 
 class CommanderDeckRequest(BaseModel):
     commander_name: str | None = None
     fmt: str = "commander"
+    # None builds the strongest deck it can; 1-5 builds to that bracket.
+    target_bracket: int | None = Field(default=None, ge=1, le=5)
 
 
 def _singleton_spec(fmt: str):
@@ -468,9 +470,11 @@ def build_commander_deck(sid: str, req: CommanderDeckRequest):
             raise HTTPException(422, f"No {spec.label}-legal legendary creatures in this collection.")
         commander = ranked[0][0]
 
-    deck = build_deck(commander, owned, fmt=req.fmt)
+    deck = build_deck(commander, owned, fmt=req.fmt, target_bracket=req.target_bracket)
     # Kept so /recommendations can diff EDHREC's list against what was actually built.
     session.setdefault("decks", {})[commander.name] = deck
+    # ...and so /bracket can re-report against the same target once combos land.
+    session.setdefault("targets", {})[commander.name] = req.target_bracket
     name = commander_archetype(deck, commander)
 
     pairs = [(card, 1) for card in deck]
@@ -482,6 +486,7 @@ def build_commander_deck(sid: str, req: CommanderDeckRequest):
         fmt=req.fmt,
         archetype=name,
         commander=commander,
+        target_bracket=req.target_bracket,
     )
 
 
@@ -541,7 +546,11 @@ def bracket(sid: str, commander: str, fmt: str = "commander", refresh: bool = Fa
         raise HTTPException(404, f"{commander} isn't in this collection.")
 
     found = combos.find_combos(commander, deck, refresh=refresh)
-    return brackets.evaluate(commander_card, deck, found, fmt=fmt)
+    # The target came in on the build request, so it is read back from the
+    # session rather than re-sent: the answer must be about the deck that was
+    # actually built, not whatever the picker happens to say now.
+    target = (session.get("targets") or {}).get(commander)
+    return brackets.evaluate(commander_card, deck, found, fmt=fmt, target=target)
 
 
 # ── EDHREC recommendations ───────────────────────────────────────────────────

@@ -14,62 +14,6 @@ from standard_builder import build_standard_deck, deck_archetype as constructed_
 from output import print_and_save, print_and_save_standard
 
 
-def _target_report(target: int, bracket: dict) -> str:
-    """Whether `--target-bracket` got what it asked for, and what to do if not.
-
-    The builder controls the card-level criteria, so it hits the target or is
-    stopped by something it cannot put in the deck — a Game Changer the
-    collection does not hold, or a combo it could not see coming.
-    """
-    got = bracket["number"]
-    name = brackets.BRACKET_NAMES[target]
-    crit = {c["key"]: c for c in bracket["criteria"]}
-    unchecked = crit["combos"]["unchecked"]
-    caveat = ("" if not unchecked else
-              " Two-card combos weren't checked, so this is the card-level"
-              " answer only.")
-
-    if target == 1:
-        # We floor at 2, so a bracket 1 request can only ever be honoured as a
-        # constraint on what went in — the label itself is the pilot's to claim.
-        # That constraint is card-level, so it holds whether or not the combo
-        # lookup ran, unlike `exhibition_ok`.
-        if got == 2 and not crit["extra_turns"]["count"] and not crit["combos"]["count"]:
-            return ("Target bracket 1: built inside Exhibition's restrictions — no Game "
-                    "Changers, no land denial, no extra turns, no combos. It is reported "
-                    "as 2 because Exhibition is a claim about why a deck was built, which "
-                    "a decklist cannot make for you." + caveat)
-        return (f"Target bracket 1: missed — the deck came out as {bracket['label']}, "
-                f"{bracket['reason']}.")
-
-    if got == target:
-        return f"Target bracket {target} ({name}): met — {bracket['reason']}.{caveat}"
-
-    if got > target:
-        return (f"Target bracket {target} ({name}): missed — the deck came out as "
-                f"{bracket['label']}, {bracket['reason']}. The builder keeps out what a "
-                f"bracket disallows card by card, but two-card combos only show up once "
-                f"the pairs are together, so they can still push a deck past its target.")
-
-    # got < target: the collection had nothing left to climb with. Every deck
-    # is welcome at a table above its own bracket, so this is not an error.
-    gc = crit["game_changers"]["count"]
-    owned_gc = f"{gc} Game Changer" + ("" if gc == 1 else "s")
-    if target == 3:
-        why = (f"it runs {owned_gc}, and "
-               + ("the combo database wasn't reached" if unchecked else
-                  "no two-card combo turned up")
-               + " — bracket 3 needs one or the other")
-    else:
-        tier = "bracket 5 is" if target == 5 else f"brackets {target} and up are"
-        why = (f"it runs {owned_gc} and nothing else in these colours pushes it "
-               f"higher; {tier} reached by playing stronger cards than the "
-               f"collection holds")
-    return (f"Target bracket {target} ({name}): not reached — the deck is "
-            f"{bracket['label']}, because {why}. Play it a bracket up if the "
-            f"table wants to.")
-
-
 @click.command()
 @click.argument("collection_path", default="ManaBox_Collection.csv")
 @click.option("--output", "-o", default="deck_output.txt", show_default=True, help="Output file path.")
@@ -182,10 +126,10 @@ def main(collection_path: str, output: str, no_recs: bool, fmt: str, colors: str
     if not no_recs:
         print("Checking for two-card combos...")
         found = find_combos(commander.name, deck)
-    bracket = brackets.evaluate(commander, deck, found, fmt=fmt)
-    if target_bracket is not None:
+    bracket = brackets.evaluate(commander, deck, found, fmt=fmt, target=target_bracket)
+    if bracket["target"]:
         print()
-        print(_target_report(target_bracket, bracket))
+        print(bracket["target"]["line"])
 
     # ── 6. EDHREC recommendations ─────────────────────────────────────────
     recs = None

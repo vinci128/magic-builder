@@ -14,7 +14,23 @@ const state = {
   format: "commander",
   commander: null,      // chosen commander name, null = best available
   colors: new Set(),    // forced colours for constructed formats
+  targetBracket: null,  // build to this bracket, null = wherever it lands
   deck: null,
+};
+
+// What asking for each bracket actually does to the build. Mirrors the
+// restrictions in brackets.py, in the second person.
+const TARGET_HINTS = {
+  "": "Builds the strongest deck it can and reports whichever bracket it lands in.",
+  1: "Exhibition: no Game Changers, no mass land denial, no extra turns at all. " +
+     "Still reported as a 2 — bracket 1 is a claim about intent that no decklist can make.",
+  2: "Core: no Game Changers, no mass land denial, no chained extra turns. " +
+     "The classic casual game, decided on turn 8 or later.",
+  3: "Upgraded: seeds in up to 3 Game Changers, which is what reaches this bracket. " +
+     "Still no land denial or chained extra turns.",
+  4: "Optimized: no restrictions, and every Game Changer you own goes in.",
+  5: "cEDH: same build as 4 — nothing in a decklist separates the two, so the deck " +
+     "is reported as a 4 at most.",
 };
 
 // ── Card database status ────────────────────────────────────────────────────
@@ -165,6 +181,23 @@ $("color-picker").addEventListener("click", (e) => {
 
 $("opt-edhrec").addEventListener("change", loadCommanders);
 
+$("bracket-picker").addEventListener("click", (e) => {
+  const btn = e.target.closest(".bracket-btn");
+  if (!btn) return;
+  state.targetBracket = btn.dataset.bracket ? Number(btn.dataset.bracket) : null;
+  $("bracket-picker").querySelectorAll(".bracket-btn").forEach((b) => {
+    const on = b === btn;
+    b.classList.toggle("is-on", on);
+    b.setAttribute("aria-pressed", String(on));
+  });
+  showTargetHint();
+});
+
+function showTargetHint() {
+  $("target-hint").textContent = TARGET_HINTS[state.targetBracket ?? ""];
+}
+showTargetHint();
+
 // ── Commander candidates ────────────────────────────────────────────────────
 
 async function loadCommanders() {
@@ -225,7 +258,8 @@ async function build() {
   const commanderMode = SINGLETON.has(state.format);
   const url = `/api/collection/${state.collectionId}/deck/${commanderMode ? "commander" : "standard"}`;
   const payload = commanderMode
-    ? { commander_name: state.commander, fmt: state.format }
+    ? { commander_name: state.commander, fmt: state.format,
+        target_bracket: state.targetBracket }
     : { colors: [...state.colors].join("") || null, fmt: state.format };
 
   try {
@@ -427,6 +461,16 @@ function renderBracket(bracket, { pending = false } = {}) {
 
   $("bracket-headline").textContent = bracket.headline;
   $("bracket-blurb").textContent = bracket.blurb;
+
+  // Only shown when the deck was built for a bracket, and it says plainly
+  // whether it got there — a target that quietly missed would be worse than
+  // no target at all.
+  const target = $("bracket-target");
+  target.hidden = !bracket.target;
+  if (bracket.target) {
+    target.textContent = bracket.target.line;
+    target.dataset.met = String(bracket.target.met);
+  }
 
   // Bracket 5 is drawn but never lit: it is a statement of intent, not a
   // property of the list, so the backend never assigns it.

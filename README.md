@@ -104,7 +104,7 @@ Three limits worth knowing:
 - **Bracket 1 is never assigned either, and 2 is the floor.** Exhibition is a deck whose theme was chosen ahead of its power. Nearly every casual deck clears its restriction list without being one — every precon does — so a classifier that stops at the first list a deck satisfies calls every clean deck a 1. When a deck also clears bracket 1's stricter rules, that is offered as a note rather than a verdict. Moxfield and Archidekt land in the same place: their automatic detection effectively never assigns a 1.
 - **Deck speed does not move the number.** The published restrictions decide the bracket; the speed read sits next to it, because a deck with fast mana and eight one-mana answers but no Game Changer is a 2 by the letter of the rules while being able to end a game well before the turn 8 that bracket asks for.
 
-`--target-bracket N` builds to a bracket instead of reporting one. It keeps out what that bracket disallows (Game Changers below 3, mass land denial and chained extra turns below 4) and seeds in the Game Changers that reach 3 and above — synergy scoring alone never picks them, since Farewell shares nothing with an Elemental commander. Two-card combos depend on which pairs end up together and are only known once Spellbook has answered, so they are reported against the target rather than built around, and the CLI says so when they push a deck past what you asked for.
+**Building to a bracket.** `--target-bracket N` on the CLI, or the target picker in the web UI's format panel, builds to a bracket instead of reporting one. It keeps out what that bracket disallows (Game Changers below 3, mass land denial and chained extra turns below 4) and seeds in the Game Changers that reach 3 and above — synergy scoring alone never picks them, since Farewell shares nothing with an Elemental commander. Two-card combos depend on which pairs end up together and are only known once Spellbook has answered, so they are reported against the target rather than built around, and the CLI says so when they push a deck past what you asked for.
 
 The combo check is the only part that needs the network. The CLI skips it under `--no-recs`, and the web UI renders the bracket immediately from the local criteria and refines it when Spellbook answers. Either way an unchecked combo criterion is reported as unchecked rather than as clean, since a missed combo can only mean the real bracket is *higher*. Responses are cached under `.cache/combos/` for a week, keyed by deck contents.
 
@@ -124,7 +124,7 @@ The Scryfall database loads once in the background at startup — the header sho
 | `GET /api/status` | Card database readiness |
 | `POST /api/collection` | Upload a collection file, returns an id plus collection stats |
 | `GET /api/collection/{id}/commanders` | Ranked commander candidates (`?edhrec=true` adds popularity weighting, `?fmt=` picks commander or brawl) |
-| `POST /api/collection/{id}/deck/commander` | Build a 100-card singleton deck (`commander_name`, `fmt`: commander \| brawl) |
+| `POST /api/collection/{id}/deck/commander` | Build a 100-card singleton deck (`commander_name`, `fmt`: commander \| brawl, `target_bracket`: 1-5) |
 | `POST /api/collection/{id}/deck/standard` | Build a 60-card deck plus sideboard (`colors`, `fmt`: standard \| pauper) |
 | `GET /api/collection/{id}/recommendations` | EDHREC upgrades and acquisitions for a built deck (`commander`, `limit`, `refresh`) |
 

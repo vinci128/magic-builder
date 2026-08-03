@@ -61,6 +61,19 @@
           <span>Weight by EDHREC popularity <em>(slower — one lookup per candidate)</em></span>
         </label>
         <div class="cmd-list" id="commander-list"></div>
+
+        <div class="target">
+          <span class="target-label">Target bracket</span>
+          <div class="bracket-picker" id="bracket-picker" role="group" aria-label="Target bracket">
+            <button class="bracket-btn is-on" data-bracket="" aria-pressed="true">Any</button>
+            <button class="bracket-btn" data-bracket="1" aria-pressed="false">1</button>
+            <button class="bracket-btn" data-bracket="2" aria-pressed="false">2</button>
+            <button class="bracket-btn" data-bracket="3" aria-pressed="false">3</button>
+            <button class="bracket-btn" data-bracket="4" aria-pressed="false">4</button>
+            <button class="bracket-btn" data-bracket="5" aria-pressed="false">5</button>
+          </div>
+          <p class="pane-note" id="target-hint"></p>
+        </div>
       </div>
 
       <div class="tabpane" id="pane-standard" hidden>
@@ -132,6 +145,7 @@
         <div class="bracket-body">
           <div class="bracket-scale" id="bracket-scale" role="img" aria-label="Bracket 1 to 5"></div>
           <div class="bracket-detail">
+            <p class="bracket-target" id="bracket-target" hidden></p>
             <p class="bracket-blurb" id="bracket-blurb"></p>
             <ul class="bracket-criteria" id="bracket-criteria"></ul>
             <p class="bracket-note" id="bracket-notes" hidden></p>
