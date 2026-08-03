@@ -183,9 +183,11 @@ def _criteria(cards: list, combos) -> list:
     if combos is None or not combos.checked:
         reason = (combos.error.split("\n")[0][:80] if combos and combos.error
                   else "the combo database wasn't reached")
+        # The consequence lives in `notes`, which both the CLI and the web UI
+        # print once; repeating it here read as duplicated copy in the panel.
         out.append(Criterion(
             "combos", "Two-card combos", 0, [],
-            f"Not checked — {reason}. The bracket below may be an underestimate.",
+            f"Not checked — {reason}.",
             unchecked=True,
         ))
     else:

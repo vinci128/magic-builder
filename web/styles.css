@@ -679,6 +679,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
   .bracket-body { grid-template-columns: minmax(0, 1fr); }
   .bracket-crit { grid-template-columns: minmax(0, 1fr) 26px; }
   .bracket-crit-note, .bracket-crit-cards { grid-column: 1 / -1; }
+  /* Each criterion now wraps onto three rows, so the space between criteria
+     has to beat the space inside one or the groupings read as a flat list. */
+  .bracket-criteria { gap: 15px; }
+  .bracket-crit { row-gap: 2px; }
 }
 
 .syn-themes { display: grid; gap: 6px; margin-top: 14px; }
