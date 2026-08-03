@@ -1,0 +1,98 @@
+Commander
+1 Korvold, Fae-Cursed King
+
+Deck
+1 Cut Down
+1 Fatal Push
+1 Bone Shards
+1 Bloodchief's Thirst
+1 Annihilating Glare
+1 Go for the Throat
+1 Infernal Grasp
+1 Abrade
+1 Feed the Swarm
+1 Bedevil
+1 Riveteers Charm
+1 Vraska, Golgari Queen
+1 The Meathook Massacre
+1 Extinction Event
+1 Thoughtseize
+1 Village Rites
+1 Corrupted Conviction
+1 Deadly Dispute
+1 Hangarback Walker
+1 Stonecoil Serpent
+1 Gilded Goose
+1 Greedy Freebooter
+1 Reckless Lackey
+1 Voldaren Epicure
+1 Shambling Ghast
+1 Fanatical Firebrand
+1 Witch's Oven
+1 Oni-Cult Anvil
+1 Bloodtithe Harvester
+1 Riveteers Requisitioner
+1 Tenacious Underdog
+1 Charming Scoundrel
+1 Kroxa, Titan of Death's Hunger
+1 Priest of Forgotten Gods
+1 Mayhem Devil
+1 Fable of the Mirror-Breaker
+1 Midnight Reaper
+1 Zulaport Cutthroat
+1 Judith, the Scourge Diva
+1 Woe Strider
+1 Yahenni, Undying Partisan
+1 Captain Lannery Storm
+1 Greta, Sweettooth Scourge
+1 Graveyard Trespasser
+1 Glissa Sunslayer
+1 Ob Nixilis, the Adversary
+1 Old-Growth Troll
+1 Sheoldred, the Apocalypse
+1 Chandra, Torch of Defiance
+1 Erebos, Bleak-Hearted
+1 Atsushi, the Blazing Sky
+1 Immersturm Predator
+1 Bristlebud Farmer
+1 Skyfisher Spider
+1 Binding the Old Gods
+1 God-Eternal Bontu
+1 The Gitrog Monster
+1 Goldspan Dragon
+1 Bonehoard Dracosaur
+1 Liliana, Dreadhorde General
+1 Ziatora, the Incinerator
+1 Blood Crypt
+1 Overgrown Tomb
+1 Stomping Ground
+1 Blightstep Pathway
+1 Cragcrown Pathway
+1 Darkbore Pathway
+1 Blooming Marsh
+1 Copperline Gorge
+1 Karplusan Forest
+1 Llanowar Wastes
+1 Sulfurous Springs
+1 Dragonskull Summit
+1 Rootbound Crag
+1 Woodland Cemetery
+1 Haunted Ridge
+1 Rockfall Vale
+1 Deathcap Glade
+1 Smoldering Marsh
+1 Cinder Glade
+1 Ziatora's Proving Ground
+1 Underground Mortuary
+1 Raucous Theater
+1 Phyrexian Tower
+1 Boseiju, Who Endures
+1 Takenuma, Abandoned Mire
+1 Sokenzan, Crucible of Defiance
+1 Castle Locthwain
+1 Den of the Bugbear
+1 Hive of the Eye Tyrant
+1 Fabled Passage
+4 Swamp
+2 Mountain
+2 Forest

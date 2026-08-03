@@ -1,7 +1,6 @@
 Commander
 1 Leonardo, the Balance (TMC) 1
 Deck
-1 Acidic Slime (M12) 161
 1 April O'Neil, Live on the Scene (TMC) 9
 1 Arcane Signet (ANB) 117
 1 Ash Barrens (J25) 154
@@ -52,7 +51,6 @@ Deck
 1 Thriving Moor (JMP) 37
 1 Tokka & Rahzar, Unsupervised (TMC) 28
 1 Turtle Lair (TMT) 190
-1 Vanquish the Horde (MID) 41
 1 Vibrant Cityscape (OM1) 188
 1 Voracious Hydra (M20) 200
 1 Burrog Barrage (SOS) 141
@@ -73,25 +71,25 @@ Deck
 1 Chart a Course (FDN) 586
 1 Eat to Extinction (THB) 90
 1 Soul Shatter (ZNR) 127
-1 Elspeth Conquers Death (THB) 13
-1 Luminous Broodmoth (IKO) 21
 1 Terror of the Peaks (M21) 164
 1 God-Eternal Oketra (WAR) 16
-1 Vizier of the Menagerie (FDN) 649
-1 Kroxa, Titan of Death's Hunger (THB) 221
-1 Sorin, Vengeful Bloodlord (WAR) 217
-1 Angelic Destiny (FDN) 565
-
-// --- Curve & Synergy Improvements ---
 1 Llanowar Elves (FDN) 227
 1 Opt (FDN) 512
 1 Dragon Fodder (FDN) 535
 1 Anthem of Champions (FDN) 116
-1 Vampiric Rites (FDN) 615
-1 Reassembling Skeleton (FDN) 182
 1 Good-Fortune Unicorn (FDN) 240
-1 Midnight Reaper (FDN) 609
 1 Heroic Reinforcements (FDN) 241
 1 Krenko, Mob Boss (FDN) 204
-1 Spinner of Souls (FDN) 112
-1 Open the Graves (M19) 112
+1 Resolute Reinforcements (FDN) 145
+1 Searslicer Goblin (FDN) 93
+1 Piper of the Swarm (ELD) 100
+1 Jewel Thief (SNC) 151
+1 The First Iroan Games (THB) 170
+1 Forbidden Friendship (IKO) 119
+1 Faebloom Trick (FDN) 38
+1 Ilysian Caryatid (THB) 174
+1 Druid of the Cowl (M19) 177
+1 Halana and Alena, Partners (FDN) 659
+1 Garruk's Uprising (FDN) 220
+1 Eliminate (M21) 97
+1 Bake into a Pie (FDN) 169
