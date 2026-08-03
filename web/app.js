@@ -288,6 +288,9 @@ function renderDeck(deck) {
 
   renderCurve(deck.curve);
   renderPipMeter($("deck-pips"), deck.pips);
+  // Shown straight away from the local criteria, then refined once the combo
+  // lookup lands — the panel never blocks the deck.
+  renderBracket(deck.bracket, { pending: !!deck.bracket });
   renderSynergy(deck.synergy);
   renderColumns($("columns"), deck.categories);
   renderSideboard(deck);
@@ -299,8 +302,12 @@ function renderDeck(deck) {
   $("deck").scrollIntoView({ behavior: "smooth", block: "start" });
 
   // Recommendations need a round trip to EDHREC, so they land after the deck.
-  if (deck.commander) loadRecommendations(deck.commander.name);
-  else $("recs").hidden = true;
+  if (deck.commander) {
+    loadRecommendations(deck.commander.name);
+    if (deck.bracket) loadBracket(deck.commander.name, deck.format);
+  } else {
+    $("recs").hidden = true;
+  }
 }
 
 // ── EDHREC recommendations ──────────────────────────────────────────────────
@@ -398,6 +405,90 @@ function renderCurve(curve) {
 }
 
 // ── Synergy ─────────────────────────────────────────────────────────────────
+
+// ── Commander bracket ───────────────────────────────────────────────────────
+
+const BRACKET_STEPS = [
+  { n: 1, name: "Exhibition" },
+  { n: 2, name: "Core" },
+  { n: 3, name: "Upgraded" },
+  { n: 4, name: "Optimized" },
+  { n: 5, name: "cEDH" },
+];
+
+function renderBracket(bracket, { pending = false } = {}) {
+  const section = $("bracket");
+  if (!bracket) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  section.classList.toggle("is-pending", pending);
+
+  $("bracket-headline").textContent = bracket.headline;
+  $("bracket-blurb").textContent = bracket.blurb;
+
+  // Bracket 5 is drawn but never lit: it is a statement of intent, not a
+  // property of the list, so the backend never assigns it.
+  const scale = $("bracket-scale");
+  scale.replaceChildren();
+  BRACKET_STEPS.forEach((step) => {
+    const cell = document.createElement("div");
+    cell.className = "bracket-step";
+    if (step.n === bracket.number) cell.classList.add("is-current");
+    if (step.n === 5) cell.classList.add("is-unreachable");
+    cell.innerHTML = `<span class="bracket-step-n">${step.n}</span>
+      <span class="bracket-step-name"></span>`;
+    cell.querySelector(".bracket-step-name").textContent = step.name;
+    cell.title = step.n === 5
+      ? "cEDH is about intent — it can't be read off a decklist"
+      : step.name;
+    scale.append(cell);
+  });
+
+  const list = $("bracket-criteria");
+  list.replaceChildren();
+  bracket.criteria.forEach((crit) => {
+    const li = document.createElement("li");
+    li.className = "bracket-crit";
+    if (crit.unchecked) li.classList.add("is-unchecked");
+    else if (crit.count) li.classList.add("is-hit");
+    li.innerHTML = `<span class="bracket-crit-label"></span>
+      <span class="bracket-crit-count">${crit.unchecked ? "?" : crit.count}</span>
+      <span class="bracket-crit-note"></span>`;
+    li.querySelector(".bracket-crit-label").textContent = crit.label;
+    li.querySelector(".bracket-crit-note").textContent = crit.note;
+    // The cards behind the count are the actionable part — swap one out and
+    // the bracket moves.
+    if (crit.cards && crit.cards.length) {
+      const named = document.createElement("span");
+      named.className = "bracket-crit-cards";
+      named.textContent = crit.cards.join(", ");
+      li.append(named);
+    }
+    list.append(li);
+  });
+
+  const notes = $("bracket-notes");
+  const text = (bracket.notes || []).join(" ");
+  notes.hidden = !text;
+  notes.textContent = text;
+}
+
+async function loadBracket(commanderName, fmt) {
+  const deckBracket = $("bracket");
+  if (deckBracket.hidden) return;
+  try {
+    const res = await fetch(
+      `/api/collection/${state.collectionId}/bracket?commander=${encodeURIComponent(commanderName)}` +
+      `&fmt=${encodeURIComponent(fmt)}`
+    );
+    if (!res.ok) return; // keep the combo-free estimate already on screen
+    renderBracket(await res.json());
+  } catch {
+    // Offline: the local estimate stands, and says combos went unchecked.
+  }
+}
 
 function renderSynergy(syn) {
   const section = $("synergy");

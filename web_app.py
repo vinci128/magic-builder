@@ -21,6 +21,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+import brackets
+import combos
 import formats
 from arena_collection import detect_collection_format, load_owned_cards
 from card_data import load_scryfall_lookup, load_by_name, enrich_collection, name_key
@@ -292,6 +294,14 @@ def _deck_payload(pairs: list, *, colors: set, pretty: str, decklist: str,
         {"name": name, "count": sum(c["count"] for c in grouped[name]), "cards": grouped[name]}
         for name in CATEGORY_ORDER if name in grouped
     ]
+    # The local half of the bracket — instant, and correct offline. The combo
+    # criterion needs Commander Spellbook, so /bracket refines this afterwards
+    # rather than making every build wait on a third-party round trip.
+    bracket = None
+    if commander is not None and formats.get(fmt).singleton:
+        bracket = brackets.evaluate(commander, [card for card, _ in pairs],
+                                    None, fmt=fmt)
+
     total = sum(count for _, count in pairs) + (1 if commander else 0)
     side = [_card_json(card, count) for card, count in (sideboard or [])]
     price = sum((card.price_usd or 0.0) * count for card, count in pairs)
@@ -312,6 +322,7 @@ def _deck_payload(pairs: list, *, colors: set, pretty: str, decklist: str,
         "curve": _curve(pairs),
         "pips": _pip_demand(pairs),
         "synergy": synergy,
+        "bracket": bracket,
         "pretty": pretty,
         "decklist": decklist,
     }
@@ -508,6 +519,29 @@ def build_standard(sid: str, req: StandardDeckRequest):
         archetype=name,
         sideboard=[(e.card, e.count) for e in sideboard],
     )
+
+
+# ── Bracket ──────────────────────────────────────────────────────────────────
+
+@app.get("/api/collection/{sid}/bracket")
+def bracket(sid: str, commander: str, fmt: str = "commander", refresh: bool = False):
+    """The deck's bracket with the combo criterion filled in.
+
+    The deck payload already carries a bracket computed without combo data;
+    this recomputes it once Commander Spellbook has answered, which can move a
+    deck up but never down.
+    """
+    session = _session(sid)
+    deck = (session.get("decks") or {}).get(commander)
+    if deck is None:
+        raise HTTPException(409, "Build the deck first — the bracket describes it.")
+
+    commander_card = next((c for c in session["owned"] if c.name == commander), None)
+    if commander_card is None:
+        raise HTTPException(404, f"{commander} isn't in this collection.")
+
+    found = combos.find_combos(commander, deck, refresh=refresh)
+    return brackets.evaluate(commander_card, deck, found, fmt=fmt)
 
 
 # ── EDHREC recommendations ───────────────────────────────────────────────────

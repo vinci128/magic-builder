@@ -86,8 +86,28 @@ def format_recommendations(recs: dict) -> str:
     return "\n".join(lines)
 
 
+def _sentence(text: str) -> str:
+    return text[:1].upper() + text[1:] + "."
+
+
+def format_bracket(bracket: dict) -> str:
+    """The bracket estimate and the counts behind it, for the text output."""
+    DIV = "─" * 40
+    lines = [f"Commander bracket: {bracket['number']} — {bracket['name']}", DIV,
+             _sentence(bracket["reason"]), ""]
+    for crit in bracket["criteria"]:
+        count = "?" if crit["unchecked"] else str(crit["count"])
+        lines.append(f"  {crit['label']:<20} {count:>3}  {crit['note']}")
+        if crit["cards"]:
+            lines.append(f"  {'':<20} {'':>3}  {', '.join(crit['cards'])}")
+    for note in bracket["notes"]:
+        lines += ["", note]
+    return "\n".join(lines)
+
+
 def format_deck(commander: OwnedCard, deck: list, recs: dict | None = None,
-                *, format_label: str = "Commander", name: str = "") -> str:
+                *, format_label: str = "Commander", name: str = "",
+                bracket: dict | None = None) -> str:
     SEP = "═" * 60
     DIV = "─" * 40
     heading = f"  {format_label.upper()} DECK RECOMMENDATION"
@@ -120,6 +140,9 @@ def format_deck(commander: OwnedCard, deck: list, recs: dict | None = None,
         lines.append(f"Paper value: {_money(price)}")
     if fillers_count:
         lines.append(f"Note: {fillers_count} basic land(s) added as filler — not from your collection.")
+
+    if bracket:
+        lines += ["", format_bracket(bracket)]
 
     if recs:
         lines += ["", format_recommendations(recs)]
@@ -204,8 +227,10 @@ def print_and_save_standard(deck_entries: list, colors: set, output_path: str,
 
 def print_and_save(commander: OwnedCard, deck: list, output_path: str,
                    recs: dict | None = None, *,
-                   format_label: str = "Commander", name: str = ""):
-    pretty = format_deck(commander, deck, recs, format_label=format_label, name=name)
+                   format_label: str = "Commander", name: str = "",
+                   bracket: dict | None = None):
+    pretty = format_deck(commander, deck, recs, format_label=format_label, name=name,
+                         bracket=bracket)
     importable = format_decklist(commander, deck)
 
     print(pretty)

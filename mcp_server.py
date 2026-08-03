@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from mcp.server.fastmcp import FastMCP
 
+import brackets
 from arena_collection import load_owned_cards
 from card_data import load_scryfall_lookup, enrich_collection
 from commander import find_commanders
@@ -119,9 +120,14 @@ def build_commander_deck(commander_name: str, csv_path: str = CSV_PATH) -> str:
             role = "synergy"
         annotated.append(card_dict(c, role))
 
+    # Local criteria only: an MCP tool call should not wait on Commander
+    # Spellbook, and the payload says plainly that combos went unchecked.
+    bracket = brackets.evaluate(commander, deck, None)
+
     result = {
         "commander": card_dict(commander),
         "total_cards": len(deck) + 1,
+        "bracket": bracket,
         "deck": annotated,
         "summary": {
             "lands": sum(1 for c in annotated if c["role"] == "land"),

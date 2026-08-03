@@ -20,6 +20,7 @@ Builds a Commander, Brawl, Standard or Pauper deck from your collection using Sc
   - Flash bonus for instant-speed creature play
   - Penalties for Ripple (useless in singleton), Equipment draw without Equipment, Angel synergy without Angels, self-mill for colorless mana
 - Auto-distributes basic lands weighted by color demand of non-land cards
+- **Commander bracket (1-5)** estimated for every Commander and Brawl deck, with the evidence behind it — see below
 - EDHREC recommendation pass on finished Commander decks: splits what other players run into **upgrades** (cards you own that the builder skipped) and **acquisitions** (cards you don't own that most decks with this commander run), each labelled Staple / Flex / Tech by inclusion rate, with a synergy score and a price. Cached on disk for a week.
 - Web UI (`python web_app.py`): upload a collection, pick a format and a commander or colours, read the deck with its name, price, mana curve, pip demand, sideboard, EDHREC recommendations, and card art previews
 - MCP server exposing four tools Claude can call directly
@@ -77,6 +78,22 @@ The EDHREC pass runs on Commander decks only and needs no credentials. Responses
 Output is printed to the console and saved as:
 - `deck_output.txt` — formatted deck list with sections
 - `deck_output.decklist.txt` — plain `1 Card Name` import format for MTGO/Arena/Moxfield
+
+## Commander brackets
+
+Every Commander and Brawl deck is scored against WotC's bracket scale — 1 Exhibition, 2 Core, 3 Upgraded, 4 Optimized, 5 cEDH — and reported with the cards that decided it. A deck's bracket is the lowest one whose restrictions it satisfies, so the panel shows all five criteria and marks the ones that fired:
+
+| Criterion | Source |
+| --- | --- |
+| Game Changers | Scryfall's `game_changer` field — WotC's published list, so this one is exact |
+| Mass land denial | Rules-text detection (`brackets.py`), matching sweeps and lock pieces but not spot land removal |
+| Extra turns | Rules-text detection, separating one-shot spells from permanents that repeat |
+| Tutors | Rules-text detection, excluding land fetch |
+| Two-card infinite combos | [Commander Spellbook](https://commanderspellbook.com), which classifies each combo as two-card and reports how early it can go off |
+
+Two limits worth knowing. **Bracket 5 is never assigned**: nothing in a decklist separates cEDH from Optimized — it is a claim about the metagame the deck was built for, which only its pilot can make. And the **tutor thresholds are this project's reading**, not a published number: WotC says bracket 1 runs none and bracket 2 "a small number", so tutoring only ever decides 1-vs-2 here.
+
+The combo check is the only part that needs the network. The CLI skips it under `--no-recs`, and the web UI renders the bracket immediately from the local criteria and refines it when Spellbook answers. Either way an unchecked combo criterion is reported as unchecked rather than as clean, since a missed combo can only mean the real bracket is *higher*. Responses are cached under `.cache/combos/` for a week, keyed by deck contents.
 
 ## Web UI
 
@@ -165,6 +182,8 @@ magic_builder/
 ├── formats.py           # Format specs: legality key, deck size, copy cap, sideboard
 ├── archetype.py         # Colour-combo names (Azorius, Jund...) and deck naming
 ├── commander.py         # Commander candidate scoring and selection
+├── brackets.py          # Commander bracket (1-5) estimation and its criteria
+├── combos.py            # Two-card combo lookup via Commander Spellbook (.cache/combos/)
 ├── deck_builder.py      # 99-card singleton deck construction and synergy scoring
 ├── standard_builder.py  # 60-card constructed deck builder + sideboard
 ├── edhrec_recs.py       # EDHREC upgrade / acquisition recommendations (.cache/edhrec/)

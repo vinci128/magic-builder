@@ -2,8 +2,10 @@ import sys
 
 import click
 
+import brackets
 import formats
 from arena_collection import load_owned_cards
+from combos import find_combos
 from card_data import load_scryfall_lookup, load_by_name, enrich_collection
 from commander import find_commanders
 from deck_builder import build_deck, deck_archetype as commander_archetype
@@ -99,16 +101,26 @@ def main(collection_path: str, output: str, no_recs: bool, fmt: str, colors: str
     if violations:
         click.echo(f"Warning: {len(violations)} card(s) violate color identity — please report this bug.", err=True)
 
-    # ── 5. EDHREC recommendations ─────────────────────────────────────────
+    # ── 5. Bracket ────────────────────────────────────────────────────────
+    # --no-recs is the offline switch, and the combo lookup is the only part of
+    # the bracket that needs the network; the rest is computed either way.
+    found = None
+    if not no_recs:
+        print("Checking for two-card combos...")
+        found = find_combos(commander.name, deck)
+    bracket = brackets.evaluate(commander, deck, found, fmt=fmt)
+
+    # ── 6. EDHREC recommendations ─────────────────────────────────────────
     recs = None
     if not no_recs:
         print("Fetching EDHREC recommendations...")
         recs = recommend(commander, owned, deck, card_index=load_by_name())
 
-    # ── 6. Output ──────────────────────────────────────────────────────────
+    # ── 7. Output ──────────────────────────────────────────────────────────
     print()
     print_and_save(commander, deck, output, recs,
-                   format_label=spec.label, name=commander_archetype(deck, commander))
+                   format_label=spec.label, name=commander_archetype(deck, commander),
+                   bracket=bracket)
 
 
 if __name__ == "__main__":

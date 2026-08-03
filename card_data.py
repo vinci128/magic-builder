@@ -21,7 +21,7 @@ CACHE_TTL = 7 * 86400  # 7 days — bulk data barely changes between set release
 _PLAIN_FIELDS = (
     "id", "name", "set", "set_name", "collector_number", "color_identity",
     "type_line", "oracle_text", "keywords", "cmc", "mana_cost", "power",
-    "toughness", "rarity", "price_usd",
+    "toughness", "rarity", "price_usd", "game_changer",
 )
 # Derived keys whose stored form differs from what callers ask for.
 _SLOTS = _PLAIN_FIELDS + ("legal_formats", "image_url", "face")
@@ -187,6 +187,9 @@ def _slim(card: dict) -> CardView:
     view.rarity = _shared(card.get("rarity"))
     # Prices repeat heavily (a few hundred distinct values across 116k printings).
     view.price_usd = _shared(_usd(card.get("prices")))
+    # WotC's Game Changer list, as maintained by Scryfall — the one bracket
+    # criterion that is a published fact rather than something to infer.
+    view.game_changer = card.get("game_changer") is True
 
     # Every consumer only ever asks whether a format is "legal", so the other
     # three states (not_legal / banned / restricted) need not be stored.
@@ -305,5 +308,6 @@ def enrich_collection(owned_cards: list, scryfall_lookup: dict):
         card.legalities = data.get("legalities", {})
         card.image_url = data.get("image_uris") or front.get("image_uris") or ""
         card.price_usd = data.get("price_usd") or 0.0
+        card.game_changer = data.get("game_changer") is True
     if missing:
         print(f"  Warning: {missing} card(s) not found in Scryfall data (may be very new prints).")

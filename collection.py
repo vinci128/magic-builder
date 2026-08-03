@@ -22,6 +22,7 @@ class OwnedCard:
     legalities: dict = field(default_factory=dict)
     image_url: str = ""
     price_usd: float = 0.0  # non-foil USD for this printing, 0.0 when unpriced
+    game_changer: bool = False  # on WotC's Game Changer list (see brackets.py)
     is_basic_filler: bool = False  # True when added as basic land padding
 
 

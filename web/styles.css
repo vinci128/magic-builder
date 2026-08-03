@@ -585,6 +585,102 @@ button { font: inherit; color: inherit; cursor: pointer; }
   margin-bottom: var(--gap);
 }
 
+/* ── Commander bracket ───────────────────────────────────────────────────── */
+
+.bracket {
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 18px;
+  margin-bottom: var(--gap);
+}
+
+/* While the combo lookup is out, the reading is provisional — dim it rather
+   than blocking the panel, since the local criteria are already correct. */
+.bracket.is-pending .bracket-scale,
+.bracket.is-pending .bracket-criteria { opacity: 0.62; }
+
+.bracket-body {
+  display: grid;
+  grid-template-columns: minmax(0, 240px) minmax(0, 1fr);
+  gap: 20px;
+  margin-top: 14px;
+}
+
+.bracket-scale { display: grid; gap: 3px; align-content: start; }
+
+.bracket-step {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: var(--raised);
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.bracket-step-n {
+  font-family: var(--data);
+  font-size: 11px;
+  text-align: center;
+  color: var(--ink-3);
+}
+.bracket-step-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bracket-step.is-current {
+  border-color: var(--brass-dim);
+  background: color-mix(in srgb, var(--brass) 12%, var(--raised));
+  color: var(--ink);
+}
+.bracket-step.is-current .bracket-step-n { color: var(--brass); }
+.bracket-step.is-unreachable { opacity: 0.45; font-style: italic; }
+
+.bracket-blurb { margin: 0 0 10px; font-size: 13px; color: var(--ink-2); }
+
+.bracket-criteria { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+
+.bracket-crit {
+  display: grid;
+  grid-template-columns: minmax(0, 128px) 26px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.bracket-crit-label { color: var(--ink-2); }
+.bracket-crit-count {
+  font-family: var(--data);
+  font-size: 11px;
+  text-align: right;
+  color: var(--ink-3);
+}
+.bracket-crit.is-hit .bracket-crit-label,
+.bracket-crit.is-hit .bracket-crit-count { color: var(--brass); }
+.bracket-crit.is-unchecked .bracket-crit-count { color: var(--alert); }
+
+/* The offending cards wrap under the row they belong to. */
+.bracket-crit-cards {
+  grid-column: 3;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  font-style: italic;
+}
+
+.bracket-note {
+  margin: 12px 0 0;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  border-top: 1px solid var(--rule-soft);
+  padding-top: 10px;
+}
+
+@media (max-width: 720px) {
+  .bracket-body { grid-template-columns: minmax(0, 1fr); }
+  .bracket-crit { grid-template-columns: minmax(0, 1fr) 26px; }
+  .bracket-crit-note, .bracket-crit-cards { grid-column: 1 / -1; }
+}
+
 .syn-themes { display: grid; gap: 6px; margin-top: 14px; }
 
 .syn-theme {
