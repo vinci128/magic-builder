@@ -154,8 +154,11 @@ _SELF_EXILE_RE = re.compile(r"exile (it|this card)(\.| instead)")
 # "for a card", "for a creature card", "and graveyard for an artifact card". The
 # qualifier between "for a" and "card" is captured so land fetch can be dropped:
 # every ramp deck searches up a Forest and the bracket rules do not count it.
+# "an" comes before "a": leftmost alternation wins, so `a|an` would match the
+# "a" of "an equipment card" and leave "n equipment" as the qualifier — and a
+# stray "n" matches almost every type line on earth.
 _TUTOR_RE = re.compile(
-    r"search your library[^.]{0,25}?for (?:a|an|up to \w+)([^.,;]{0,40}?)\bcards?\b"
+    r"search your library[^.]{0,25}?for (?:an|a|up to \w+)([^.,;]{0,40}?)\bcards?\b"
 )
 _LAND_FETCH_RE = re.compile(
     r"\b(land|lands|basic|plains|island|swamp|mountain|forest|gate)\b"
@@ -202,6 +205,50 @@ def is_game_changer(card) -> bool:
     return bool(getattr(card, "game_changer", False))
 
 
+# Lands worth spending a Crop Rotation on that are not themselves on the Game
+# Changers list. The listed ones are found via `is_game_changer`, so this only
+# has to carry the rest, and the halves together are what makes the card what
+# it is: Crop Rotation converts a land into *the* land, which needs the deck to
+# hold one worth converting into.
+_HIGH_IMPACT_LANDS = frozenset((
+    "dark depths", "thespian's stage", "cabal coffers", "urborg, tomb of yawgmoth",
+    "nykthos, shrine to nyx", "maze of ith", "bazaar of baghdad", "diamond valley",
+    "academy ruins", "volrath's stronghold", "bojuka bog", "boseiju, who endures",
+    "otawara, soaring city", "takenuma, abandoned mire", "war room", "reliquary tower",
+    "high market", "phyrexian tower", "miren, the moaning well", "westvale abbey",
+    "hall of the bandit lord", "inventors' fair", "deserted temple",
+))
+
+
+def _crop_rotation_lives(deck: list) -> bool:
+    return any(
+        "Land" in c.type_line
+        and (is_game_changer(c) or c.name.lower() in _HIGH_IMPACT_LANDS)
+        for c in deck
+    )
+
+
+# Game Changers whose power is a property of the deck around them rather than
+# of the card. They stay in the official count either way — the list is WotC's
+# and the bracket rule counts cards — but an inert one is worth saying out loud.
+CONDITIONAL_GAME_CHANGERS = {
+    "crop rotation": (
+        _crop_rotation_lives,
+        "there is no land in this deck worth fetching with it",
+    ),
+}
+
+
+def inert_game_changers(cards: list) -> list:
+    """Game Changers present that this deck gives nothing to do."""
+    out = []
+    for card in cards:
+        rule = CONDITIONAL_GAME_CHANGERS.get(card.name.lower())
+        if rule and not rule[0](cards):
+            out.append((card.name, rule[1]))
+    return out
+
+
 def is_mass_land_denial(card) -> bool:
     t = _text(card)
     if _SPARES_LANDS.search(t):
@@ -229,6 +276,51 @@ def is_tutor(card) -> bool:
     """Library search for a nonland card. Land fetch is ramp, and does not count."""
     match = _TUTOR_RE.search(_text(card))
     return bool(match) and not _LAND_FETCH_RE.search(match.group(1))
+
+
+# Words in a tutor's qualifier that say nothing about what it can find.
+_TUTOR_NOISE = frozenset((
+    "a", "an", "up", "to", "or", "and", "with", "less", "greater", "than",
+    "mana", "value", "cost", "converted", "any", "that", "share", "type",
+    "types", "name", "named", "the", "of", "in", "your", "you", "control",
+    "other", "one", "two", "three", "four", "five", "nonlegendary", "legendary",
+))
+
+
+def tutor_restriction(card) -> list:
+    """The card types a tutor is restricted to, as lowercase words.
+
+    Empty for an unrestricted tutor: Demonic Tutor searches "for a card" and
+    can always find something worth having.
+    """
+    match = _TUTOR_RE.search(_text(card))
+    if not match:
+        return []
+    # Three letters minimum: no card type is shorter, and a one-letter scrap
+    # substring-matches nearly every type line.
+    return [w for w in re.findall(r"[a-z]+", match.group(1))
+            if len(w) >= 3 and w not in _TUTOR_NOISE]
+
+
+def is_live_tutor(card, deck: list) -> bool:
+    """Whether this tutor can actually find anything in this deck.
+
+    Honored Knight-Captain searches for an Equipment card. In a deck with no
+    Equipment it is a six-mana sacrifice that shuffles the library — a tutor by
+    rules text and nothing at all in play. Counting it overstates a deck's
+    consistency, and players notice: it was the first thing a tester queried.
+
+    Deliberately conservative — a tutor is dead only when *none* of its
+    restriction words appear anywhere in the deck's type lines. A narrow tutor
+    with a broad word in it (an Elf creature tutor in an Elf-less creature deck)
+    still reads as live, because half-finding something is not nothing and a
+    false accusation is worse here than a miss.
+    """
+    words = tutor_restriction(card)
+    if not words:
+        return True
+    types = " ".join(c.type_line.lower() for c in deck if c is not card)
+    return any(w in types for w in words)
 
 
 def is_fast_mana(card) -> bool:
@@ -293,10 +385,14 @@ class Criterion(NamedTuple):
 def _criteria(cards: list, combos) -> list:
     """Every bracket input, whether or not it fired."""
     game_changers = [c for c in cards if is_game_changer(c)]
+    inert = inert_game_changers(cards)
     land_denial = [c for c in cards if is_mass_land_denial(c)]
     extra_turns = [c for c in cards if is_extra_turn(c)]
     chainable = [c for c in extra_turns if is_chainable_extra_turn(c)]
-    tutors = [c for c in cards if is_tutor(c)]
+    # A tutor that can find nothing in this deck is not tutoring.
+    all_tutors = [c for c in cards if is_tutor(c)]
+    tutors = [c for c in all_tutors if is_live_tutor(c, cards)]
+    dead_tutors = [c for c in all_tutors if c not in tutors]
 
     def names(group):
         return sorted({c.name for c in group})
@@ -305,9 +401,11 @@ def _criteria(cards: list, combos) -> list:
         Criterion(
             "game_changers", "Game Changers", len(game_changers), names(game_changers),
             "None — fine for any bracket." if not game_changers else
-            (f"{len(game_changers)} of the 3 a bracket 3 deck may run."
-             if len(game_changers) <= MAX_GAME_CHANGERS_B3 else
-             f"{len(game_changers)} is past the 3 a bracket 3 deck may run."),
+            ((f"{len(game_changers)} of the 3 a bracket 3 deck may run."
+              if len(game_changers) <= MAX_GAME_CHANGERS_B3 else
+              f"{len(game_changers)} is past the 3 a bracket 3 deck may run.")
+             + (f" {_join([n for n, _ in inert])} still counts, but "
+                f"{inert[0][1]}." if inert else "")),
         ),
         Criterion(
             "land_denial", "Mass land denial", len(land_denial), names(land_denial),
@@ -326,9 +424,13 @@ def _criteria(cards: list, combos) -> list:
         ),
         Criterion(
             "tutors", "Tutors", len(tutors), names(tutors),
-            "None." if not tutors else
+            ("None." if not dead_tutors else
+             f"None that can find anything — {_join(names(dead_tutors))} "
+             f"searches for a card type this deck doesn't run.") if not tutors else
             "Tutors stopped restricting brackets in the October 2025 update; "
-            "the efficient ones are Game Changers, and already counted above.",
+            "the efficient ones are Game Changers, and already counted above."
+            + (f" {_join(names(dead_tutors))} isn't counted: there is nothing "
+               f"in the deck for it to find." if dead_tutors else ""),
         ),
     ]
 
@@ -461,6 +563,10 @@ def evaluate(commander, deck: list, combos=None, *, fmt: str = "commander",
     by_key = {c.key: c for c in criteria}
     number, blockers = _bracket_from(by_key, combos)
     number, blockers, crispi_bump = _apply_crispi_floor(number, blockers, crispi)
+    # Worth calling out only when it is the whole reason for the bracket: an
+    # inert Game Changer alongside three live ones is not what put a deck at 3.
+    inert = inert_game_changers(cards)
+    inert_decides = bool(inert) and by_key["game_changers"].count == len(inert)
     fast = by_key["speed"].count >= SPEED_SIGNALS_FAST
     # A deck built to close games early is not an Exhibition deck under any
     # reading, so the two notes are never offered together.
@@ -500,7 +606,8 @@ def evaluate(commander, deck: list, combos=None, *, fmt: str = "commander",
         "crispi": crispi,
         "crispi_bump": crispi_bump,
         "notes": _notes(number, unchecked, fmt, exhibition_ok=exhibition_ok,
-                        fast=fast, crispi_bump=crispi_bump),
+                        fast=fast, crispi_bump=crispi_bump,
+                        inert=inert if inert_decides else []),
     }
     result["target"] = _target_outcome(target, result) if target else None
     return result
@@ -508,8 +615,17 @@ def evaluate(commander, deck: list, combos=None, *, fmt: str = "commander",
 
 def _notes(number: int, unchecked: list, fmt: str, *,
            exhibition_ok: bool = False, fast: bool = False,
-           crispi_bump: dict | None = None) -> list:
+           crispi_bump: dict | None = None, inert: list | None = None) -> list:
     notes = []
+    if inert:
+        names = _join([n for n, _ in inert])
+        notes.append(
+            f"{names} is the only thing holding this deck above bracket 2, and "
+            f"{inert[0][1]} — so it is a Game Changer on the list without being "
+            f"one at the table. The count is WotC's rule and every other tool "
+            f"will read it the same way, so {number} is the honest number to "
+            f"give a table; just say what it is doing there."
+        )
     if unchecked:
         notes.append(
             "Two-card combos weren't checked, so the real bracket may be higher."

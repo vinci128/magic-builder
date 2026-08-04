@@ -230,9 +230,16 @@ SELECTION_CAP = 30   # filtering re-sorts draws; the tenth loot finds nothing ne
 REDUNDANCY_TUTOR_CAP = 7.0
 
 
-def _tutor_points(card, is_commander: bool = False) -> int:
-    """Points for one tutor, per the rubric's tiers."""
+def _tutor_points(card, deck: list | None = None) -> int:
+    """Points for one tutor, per the rubric's tiers.
+
+    A tutor that can find nothing in `deck` scores nothing: consistency is
+    about reliably finding your cards, and an Equipment tutor in a deck with no
+    Equipment finds none of them.
+    """
     name = _name(card)
+    if deck is not None and not brackets.is_live_tutor(card, deck):
+        return 0
     if name in REPEATABLE_TUTOR_ENGINES:
         return 6
     if name in COMBAT_TUTOR_ENGINES:
@@ -289,7 +296,7 @@ def consistency(cards: list, commander) -> dict:
     tutors, draw_sources, premium = [], [], 0
 
     for card in cards:
-        pts = _tutor_points(card)
+        pts = _tutor_points(card, cards)
         if pts:
             tutor_total += pts
             tutors.append(card.name)
@@ -304,7 +311,7 @@ def consistency(cards: list, commander) -> dict:
                 draw_total += dpts
 
     if commander is not None:
-        if _tutor_points(commander):
+        if _tutor_points(commander, cards):
             tutor_total += 5          # +5 when the commander is a tutor
             premium += 1
         if _draw_points(commander)[0] >= 4:
