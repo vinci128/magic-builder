@@ -90,10 +90,15 @@ def ladder(anchors: list, total: float) -> float:
 # The rubric names these explicitly; rules text cannot tell a Rhystic Study
 # from any other enchantment, so the premium tiers are lists.
 
+# Exactly the seven the rubric names. Three of them are restricted by card type
+# and premium anyway — a one-mana instant that finds any creature is not the
+# same card as a three-mana sorcery that does — so the list overrides the
+# cost-and-scope rule below rather than duplicating it. Everything else prices
+# off that rule: padding this list is how Grim Tutor and Merchant Scroll ended
+# up scoring like Demonic Tutor.
 PREMIUM_TUTORS = frozenset((
     "demonic tutor", "vampiric tutor", "imperial seal", "enlightened tutor",
-    "mystical tutor", "worldly tutor", "gamble", "grim tutor", "diabolic intent",
-    "sylvan tutor", "personal tutor", "merchant scroll", "muddle the mixture",
+    "mystical tutor", "worldly tutor", "gamble",
 ))
 
 REPEATABLE_TUTOR_ENGINES = frozenset((
@@ -250,13 +255,22 @@ def _tutor_points(card, deck: list | None = None) -> int:
         return 6
     if not brackets.is_tutor(card):
         return 0
-    # Unnamed tutors price off cost: the rubric's own split is CMC <= 2
-    # unrestricted (premium), 3-4 or restricted (standard), 5+ (narrow).
-    if card.cmc <= 2:
-        return 6
-    if card.cmc <= 4:
+    # Transmute reads as unrestricted — "search your library for a card with the
+    # same mana value as this card" leaves an empty qualifier — but it finds one
+    # mana value only, and costs its own card plus the transmute price on top.
+    # Standard tier, never premium.
+    if "transmute" in _text(card):
         return 4
-    return 2
+    # Unnamed tutors price off cost *and* scope: the rubric's premium tier is
+    # "CMC <= 2, unrestricted", and its standard tier is "CMC 3-4 **or
+    # restricted**". Pricing a two-mana artifact tutor as premium reads a deck
+    # as far more consistent than it is, because a narrow tutor only finds its
+    # own corner of the deck however cheap it is.
+    if card.cmc <= 2 and not brackets.tutor_restriction(card):
+        return 6
+    if card.cmc >= 5:
+        return 2
+    return 4
 
 
 def _draw_points(card, is_commander: bool = False) -> tuple[int, bool]:

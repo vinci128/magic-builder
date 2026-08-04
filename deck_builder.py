@@ -11,6 +11,11 @@ BASIC_LAND_TARGET    = 12   # auto-added basic lands (total lands = 36)
 RAMP_TARGET  = 10
 DRAW_TARGET  = 8
 REMOVAL_TARGET = 8
+# Tutors are a role like the three above. Without a slot of their own they only
+# ever compete in the synergy fill, where they are scored on typal overlap with
+# the commander — so a creature tutor in a party deck loses its place to a
+# Guildgate. Small, because tutors are a tool and not a plan.
+TUTOR_TARGET = 3
 # Remaining slots go to synergy/value cards
 
 BASIC_LAND_NAMES = {
@@ -374,6 +379,33 @@ def _bracket_pool(pool: list, commander: OwnedCard, target: int) -> tuple[list, 
 MAX_TUTOR_REPAIRS = 3   # swapping one tutor can strand another; converge, don't loop
 
 
+def _targets_in(pool: list, words: list) -> int:
+    """How many cards in `pool` a tutor restricted to `words` could find."""
+    if not words:
+        return len(pool)
+    return sum(1 for c in pool
+               if any(w in c.type_line.lower() for w in words))
+
+
+def _by_tutor_quality(pool: list) -> list:
+    """Tutors, best first: unrestricted, then most to find, then cheapest.
+
+    Deliberately not the synergy order the rest of the build uses — what makes
+    a tutor good is finding something useful for little mana, which has nothing
+    to do with sharing a creature type with the commander.
+
+    Target count is the middle term because cost alone gets it wrong: a
+    two-mana artifact tutor looks better than a three-mana creature tutor until
+    you notice the deck is half creatures and barely runs an artifact.
+    """
+    return sorted(
+        (c for c in pool if brackets.is_tutor(c)),
+        key=lambda c: (bool(brackets.tutor_restriction(c)),
+                       -_targets_in(pool, brackets.tutor_restriction(c)),
+                       c.cmc),
+    )
+
+
 def _replace_dead_tutors(deck: list, commander, pool: list, used_names: set) -> list:
     """Swap out tutors that can find nothing in the deck they ended up in.
 
@@ -395,7 +427,11 @@ def _replace_dead_tutors(deck: list, commander, pool: list, used_names: set) -> 
                 if brackets.is_tutor(c) and not brackets.is_live_tutor(c, context)]
         if not dead:
             break
-        spare = [c for c in pool if c.name not in used_names]
+        # A tutor slot should stay a tutor slot where it can, so a working
+        # tutor is preferred to the next card down the synergy list.
+        spare = [c for c in _by_tutor_quality(pool) if c.name not in used_names
+                 and brackets.is_live_tutor(c, context)]
+        spare += [c for c in pool if c.name not in used_names]
         if not spare:
             break
         for tutor in dead:
@@ -490,11 +526,14 @@ def build_deck(commander: OwnedCard, owned_cards: list, fmt: str = "commander",
     ramp_cards    = pick([c for c in scored_non_lands if _is_ramp(c)],     RAMP_TARGET)
     draw_cards    = pick([c for c in scored_non_lands if _is_card_draw(c)], DRAW_TARGET)
     remove_cards  = pick([c for c in scored_non_lands if _is_removal(c)],   REMOVAL_TARGET)
+    tutor_cards   = pick(_by_tutor_quality(scored_non_lands),              TUTOR_TARGET)
     nonbasic_lands = pick(scored_lands, NONBASIC_LAND_TARGET)
     synergy_cards = pick(scored_non_lands, 99)  # pick() skips already-used ids
 
-    # Assemble non-basic portion
-    non_basic_deck = nonbasic_lands + ramp_cards + draw_cards + remove_cards + synergy_cards
+    # Assemble non-basic portion. Synergy comes last because truncation cuts
+    # from the end, so the role slots above are the ones that survive.
+    non_basic_deck = (nonbasic_lands + ramp_cards + draw_cards + remove_cards
+                      + tutor_cards + synergy_cards)
 
     # Total land slots = NONBASIC_LAND_TARGET (from collection) + BASIC_LAND_TARGET (auto)
     # But if we couldn't fill the non-basic land target, add more basics to compensate

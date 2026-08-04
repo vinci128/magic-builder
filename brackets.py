@@ -287,6 +287,17 @@ _TUTOR_NOISE = frozenset((
 ))
 
 
+# "Search your library for a card named X" — the qualifier is empty, so the
+# generic path reads these as unrestricted when they are the narrowest tutors
+# there are. In a singleton format one named after itself finds nothing at all.
+_NAMED_TUTOR_RE = re.compile(r"search your library for a card named ([^,.]+)")
+
+
+def named_tutor_target(card) -> str:
+    match = _NAMED_TUTOR_RE.search(_text(card))
+    return match.group(1).strip() if match else ""
+
+
 def tutor_restriction(card) -> list:
     """The card types a tutor is restricted to, as lowercase words.
 
@@ -316,6 +327,12 @@ def is_live_tutor(card, deck: list) -> bool:
     still reads as live, because half-finding something is not nothing and a
     false accusation is worse here than a miss.
     """
+    named = named_tutor_target(card)
+    if named:
+        # Singleton: a card that searches for its own name can never find one,
+        # and one naming another card is live only if the deck runs it.
+        return any(c.name.lower() == named and c is not card for c in deck)
+
     words = tutor_restriction(card)
     if not words:
         return True
