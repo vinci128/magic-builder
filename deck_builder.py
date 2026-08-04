@@ -371,6 +371,50 @@ def _bracket_pool(pool: list, commander: OwnedCard, target: int) -> tuple[list, 
     return keep + seeds + turns, seeds
 
 
+MAX_TUTOR_REPAIRS = 3   # swapping one tutor can strand another; converge, don't loop
+
+
+def _replace_dead_tutors(deck: list, commander, pool: list, used_names: set) -> list:
+    """Swap out tutors that can find nothing in the deck they ended up in.
+
+    A restricted tutor is only worth a slot if the deck runs what it searches
+    for, and the builder cannot know that while choosing cards — Honored
+    Knight-Captain fetches an Equipment, and whether the deck has one is
+    decided by the same pass that picked the Knight. So it is fixed afterwards:
+    find the tutors with nothing to find, and spend their slots on the next
+    cards down the list instead.
+
+    Iterated a few times because a swap changes the deck the next tutor is
+    judged against — dropping the only Equipment can strand an Equipment tutor
+    that was live a moment ago.
+    """
+    out = list(deck)
+    for _ in range(MAX_TUTOR_REPAIRS):
+        context = ([commander] if commander is not None else []) + out
+        dead = [c for c in out
+                if brackets.is_tutor(c) and not brackets.is_live_tutor(c, context)]
+        if not dead:
+            break
+        spare = [c for c in pool if c.name not in used_names]
+        if not spare:
+            break
+        for tutor in dead:
+            # The pool holds one entry per printing, so the same name can appear
+            # twice — re-check as we go or a swap can duplicate a card. The dead
+            # tutor's own name stays reserved so it cannot come back.
+            replacement = None
+            while spare:
+                candidate = spare.pop(0)
+                if candidate.name not in used_names:
+                    replacement = candidate
+                    break
+            if replacement is None:
+                break
+            out[out.index(tutor)] = replacement
+            used_names.add(replacement.name)
+    return out
+
+
 def _seeded_first(scored: list, seeds: list) -> list:
     """Move `seeds` to the front of an already-scored list.
 
@@ -461,6 +505,12 @@ def build_deck(commander: OwnedCard, owned_cards: list, fmt: str = "commander",
     total_non_basic = len(non_basic_deck)
     if total_non_basic > size - basic_count:
         non_basic_deck = non_basic_deck[:size - basic_count]
+
+    # Whether a tutor can find anything is a property of the finished deck, so
+    # it can only be judged once there is one. Runs after truncation so the
+    # slot count is already final and a swap is one card for one card.
+    non_basic_deck = _replace_dead_tutors(
+        non_basic_deck, commander, scored_non_lands, used_names)
 
     # If even after basics we're short, add extra basics
     basic_count = size - len(non_basic_deck)
