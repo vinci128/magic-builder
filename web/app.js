@@ -440,6 +440,50 @@ function renderCurve(curve) {
 
 // ── Synergy ─────────────────────────────────────────────────────────────────
 
+// ── CRISPI ──────────────────────────────────────────────────────────────────
+
+// Order follows the acronym, not the payload: Consistency, Resilience,
+// Interaction, Speed.
+const CRISPI_ROWS = [
+  ["consistency", "Consistency"],
+  ["resilience", "Resilience"],
+  ["interaction", "Interaction"],
+  ["speed", "Speed"],
+];
+
+function renderCrispi(crispi) {
+  const box = $("crispi");
+  box.hidden = !crispi;
+  if (!crispi) return;
+
+  $("crispi-score").textContent = crispi.score.toFixed(2);
+
+  const rows = $("crispi-rows");
+  rows.replaceChildren();
+  CRISPI_ROWS.forEach(([key, label]) => {
+    const attr = crispi.attributes[key];
+    const li = document.createElement("li");
+    li.className = "crispi-row";
+    if (attr.estimated) li.classList.add("is-estimated");
+    // The bar is the score on a 1-10 scale; the title carries the working.
+    li.innerHTML = `<span class="crispi-label"></span>
+      <span class="crispi-bar"><i style="width:${attr.score * 10}%"></i></span>
+      <span class="crispi-value"></span>`;
+    li.querySelector(".crispi-label").textContent = label;
+    li.querySelector(".crispi-value").textContent =
+      attr.score.toFixed(2) + (attr.estimated ? "~" : "");
+    li.title = attr.detail;
+    rows.append(li);
+  });
+
+  // Never let the estimated attributes pass as counted ones.
+  const est = crispi.estimated || [];
+  $("crispi-foot").textContent = est.length
+    ? `~ ${est.join(" and ")} are estimated, not counted — a deck's ` +
+      `fundamental turn needs hands played out, which this can't do.`
+    : "";
+}
+
 // ── Commander bracket ───────────────────────────────────────────────────────
 
 const BRACKET_STEPS = [
@@ -512,6 +556,8 @@ function renderBracket(bracket, { pending = false } = {}) {
     }
     list.append(li);
   });
+
+  renderCrispi(bracket.crispi);
 
   const notes = $("bracket-notes");
   const text = (bracket.notes || []).join(" ");

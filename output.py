@@ -100,8 +100,26 @@ def format_bracket(bracket: dict) -> str:
         lines.append(f"  {crit['label']:<20} {count:>3}  {crit['note']}")
         if crit["cards"]:
             lines.append(f"  {'':<20} {'':>3}  {', '.join(crit['cards'])}")
+    if bracket.get("crispi"):
+        lines += ["", format_crispi(bracket["crispi"])]
     for note in bracket["notes"]:
         lines += ["", note]
+    return "\n".join(lines)
+
+
+CRISPI_ROWS = (("consistency", "Consistency"), ("resilience", "Resilience"),
+               ("interaction", "Interaction"), ("speed", "Speed"))
+
+
+def format_crispi(crispi: dict) -> str:
+    """The four attributes and the index, for the text output."""
+    lines = [f"CRISPI {crispi['score']:.2f}"]
+    for key, label in CRISPI_ROWS:
+        attr = crispi["attributes"][key]
+        mark = "~" if attr["estimated"] else " "
+        lines.append(f"  {label:<20}{mark}{attr['score']:>5.2f}  {attr['detail']}")
+    if crispi["estimated"]:
+        lines.append("  ~ estimated rather than counted — see crispi.py")
     return "\n".join(lines)
 
 

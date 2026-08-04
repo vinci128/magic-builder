@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 
 import brackets
 import combos
+import crispi
 import formats
 from arena_collection import detect_collection_format, load_owned_cards
 from card_data import load_scryfall_lookup, load_by_name, enrich_collection, name_key
@@ -299,8 +300,11 @@ def _deck_payload(pairs: list, *, colors: set, pretty: str, decklist: str,
     # rather than making every build wait on a third-party round trip.
     bracket = None
     if commander is not None and formats.get(fmt).singleton:
-        bracket = brackets.evaluate(commander, [card for card, _ in pairs],
-                                    None, fmt=fmt, target=target_bracket)
+        deck_cards = [card for card, _ in pairs]
+        bracket = brackets.evaluate(
+            commander, deck_cards, None, fmt=fmt, target=target_bracket,
+            crispi=crispi.evaluate(commander, deck_cards, None),
+        )
 
     total = sum(count for _, count in pairs) + (1 if commander else 0)
     side = [_card_json(card, count) for card, count in (sideboard or [])]
@@ -550,7 +554,8 @@ def bracket(sid: str, commander: str, fmt: str = "commander", refresh: bool = Fa
     # session rather than re-sent: the answer must be about the deck that was
     # actually built, not whatever the picker happens to say now.
     target = (session.get("targets") or {}).get(commander)
-    return brackets.evaluate(commander_card, deck, found, fmt=fmt, target=target)
+    return brackets.evaluate(commander_card, deck, found, fmt=fmt, target=target,
+                             crispi=crispi.evaluate(commander_card, deck, found))
 
 
 # ── EDHREC recommendations ───────────────────────────────────────────────────

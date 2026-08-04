@@ -104,6 +104,23 @@ Three limits worth knowing:
 - **Bracket 1 is never assigned either, and 2 is the floor.** Exhibition is a deck whose theme was chosen ahead of its power. Nearly every casual deck clears its restriction list without being one — every precon does — so a classifier that stops at the first list a deck satisfies calls every clean deck a 1. When a deck also clears bracket 1's stricter rules, that is offered as a note rather than a verdict. Moxfield and Archidekt land in the same place: their automatic detection effectively never assigns a 1.
 - **Deck speed does not move the number.** The published restrictions decide the bracket; the speed read sits next to it, because a deck with fast mana and eight one-mana answers but no Game Changer is a 2 by the letter of the rules while being able to end a game well before the turn 8 that bracket asks for.
 
+### CRISPI
+
+Alongside the bracket, every Commander deck is scored on **CRISPI** — Consistency, Resilience, Interaction, Speed — reimplemented from [DeckCheck's published rubric](https://deckcheck.co/blog/crispi-deep-dive). Each attribute scores 1–10 in quarter-point steps and the CRISPI Score is their mean.
+
+Its job here is the thing the card restrictions cannot see. A deck can obey every rule of bracket 2 and still end games on turn 4, so CRISPI adds **floors that raise a bracket, never lower it**:
+
+| Floor | Trips on |
+| --- | --- |
+| Bracket 5 | Speed 9+ **or** CRISPI 8.5+ |
+| Bracket 4 | Speed 8+ **or** CRISPI 7.0+ **or** (Consistency 7.5+ **and** Interaction 7.5+) |
+| Bracket 3 | Speed 6+ **or** CRISPI 5.0+ |
+| Bracket 2 | Speed 5+ **or** CRISPI 3.5+ |
+
+**Two of the four attributes are estimated, not counted.** DeckCheck's own engine is deterministic for Consistency and Interaction and leaves two judgements to an AI: Speed's *fundamental turn* (the rubric wants a dozen goldfish hands played out) and Resilience's *commander dependency*. `crispi.py` has no AI at build time, so it estimates Speed from combo speed where Commander Spellbook found one and otherwise from curve, ramp and fast mana, and assumes the format-default "Moderate" commander dependency. Both carry an `estimated` flag the whole way to the UI, which draws their bars hatched rather than solid, and the CLI marks them `~`.
+
+The scale also runs low against DeckCheck's: they recalibrated so precons centre near 5, and precons measured here land near 3.75, because their scoring leans on a hand-curated card database while this reads rules text. The error direction is the safe one — scoring low means the floors fire *less* often, so this under-promotes rather than over-promotes. Across the 15 top commanders in the sample collection, no deck is bumped; a deliberately fast, restriction-clean burn deck is correctly bumped from 2 to 3.
+
 **Building to a bracket.** `--target-bracket N` on the CLI, or the target picker in the web UI's format panel, builds to a bracket instead of reporting one. It keeps out what that bracket disallows (Game Changers below 3, mass land denial and chained extra turns below 4) and seeds in the Game Changers that reach 3 and above — synergy scoring alone never picks them, since Farewell shares nothing with an Elemental commander. Two-card combos depend on which pairs end up together and are only known once Spellbook has answered, so they are reported against the target rather than built around, and the CLI says so when they push a deck past what you asked for.
 
 The combo check is the only part that needs the network. The CLI skips it under `--no-recs`, and the web UI renders the bracket immediately from the local criteria and refines it when Spellbook answers. Either way an unchecked combo criterion is reported as unchecked rather than as clean, since a missed combo can only mean the real bracket is *higher*. Responses are cached under `.cache/combos/` for a week, keyed by deck contents.

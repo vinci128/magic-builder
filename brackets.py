@@ -423,8 +423,24 @@ def _exhibition_ok(criteria: dict, combos) -> bool:
             and not combos.two_card)
 
 
+def _apply_crispi_floor(number: int, blockers: list, crispi: dict | None) -> tuple[int, list, dict | None]:
+    """Raise `number` to a CRISPI floor when the deck trips one.
+
+    The published restrictions cannot see how fast a deck actually plays, so
+    DeckCheck's guardrails catch a deck that obeys every rule of its bracket
+    and still ends games earlier than that bracket expects. They only ever bump
+    *up*: nobody objects to a weak deck sitting in a high bracket, and two of
+    the four inputs are estimated here, so a bump down could be simply wrong.
+    """
+    floor = (crispi or {}).get("floor")
+    if not floor or floor["bracket"] <= number:
+        return number, blockers, None
+    applied = {"from": number, "to": floor["bracket"], "reason": floor["reason"]}
+    return floor["bracket"], blockers + [f"a CRISPI floor ({floor['reason']})"], applied
+
+
 def evaluate(commander, deck: list, combos=None, *, fmt: str = "commander",
-             target: int | None = None) -> dict:
+             target: int | None = None, crispi: dict | None = None) -> dict:
     """Estimate the bracket of `deck`, with the evidence behind it.
 
     `combos` is a `combos.ComboResult`, or None when the lookup was skipped;
@@ -433,6 +449,9 @@ def evaluate(commander, deck: list, combos=None, *, fmt: str = "commander",
     `target` is the bracket the deck was *built* for, when it was built for one.
     It changes nothing about the estimate — it only adds a `target` block saying
     whether the build got there, so the CLI and the web UI say the same thing.
+
+    `crispi` is a `crispi.evaluate` result. Its floors can raise the bracket
+    above what the card restrictions alone give, never lower it.
     """
     cards = [c for c in deck if not c.is_basic_filler]
     if commander is not None:
@@ -441,6 +460,7 @@ def evaluate(commander, deck: list, combos=None, *, fmt: str = "commander",
     criteria = _criteria(cards, combos)
     by_key = {c.key: c for c in criteria}
     number, blockers = _bracket_from(by_key, combos)
+    number, blockers, crispi_bump = _apply_crispi_floor(number, blockers, crispi)
     fast = by_key["speed"].count >= SPEED_SIGNALS_FAST
     # A deck built to close games early is not an Exhibition deck under any
     # reading, so the two notes are never offered together.
@@ -477,19 +497,31 @@ def evaluate(commander, deck: list, combos=None, *, fmt: str = "commander",
         # of intent that no decklist can settle.
         "exhibition_ok": exhibition_ok,
         "fast_for_bracket": fast,
-        "notes": _notes(number, unchecked, fmt,
-                        exhibition_ok=exhibition_ok, fast=fast),
+        "crispi": crispi,
+        "crispi_bump": crispi_bump,
+        "notes": _notes(number, unchecked, fmt, exhibition_ok=exhibition_ok,
+                        fast=fast, crispi_bump=crispi_bump),
     }
     result["target"] = _target_outcome(target, result) if target else None
     return result
 
 
 def _notes(number: int, unchecked: list, fmt: str, *,
-           exhibition_ok: bool = False, fast: bool = False) -> list:
+           exhibition_ok: bool = False, fast: bool = False,
+           crispi_bump: dict | None = None) -> list:
     notes = []
     if unchecked:
         notes.append(
             "Two-card combos weren't checked, so the real bracket may be higher."
+        )
+    if crispi_bump:
+        notes.append(
+            f"The card restrictions put this at {crispi_bump['from']}, but its "
+            f"CRISPI score trips the bracket {crispi_bump['to']} floor "
+            f"({crispi_bump['reason']}) — it plays faster than bracket "
+            f"{crispi_bump['from']} expects. Speed and Resilience are estimated "
+            f"rather than counted, so treat the bump as a prompt to check the "
+            f"deck against the table, not as a verdict."
         )
     if fast and number == 2:
         notes.append(

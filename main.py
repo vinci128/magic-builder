@@ -3,6 +3,7 @@ import sys
 import click
 
 import brackets
+import crispi
 import formats
 from arena_collection import load_owned_cards
 from combos import find_combos
@@ -126,7 +127,9 @@ def main(collection_path: str, output: str, no_recs: bool, fmt: str, colors: str
     if not no_recs:
         print("Checking for two-card combos...")
         found = find_combos(commander.name, deck)
-    bracket = brackets.evaluate(commander, deck, found, fmt=fmt, target=target_bracket)
+    score = crispi.evaluate(commander, deck, found)
+    bracket = brackets.evaluate(commander, deck, found, fmt=fmt,
+                                target=target_bracket, crispi=score)
     if bracket["target"]:
         print()
         print(bracket["target"]["line"])
