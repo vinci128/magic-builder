@@ -49,6 +49,7 @@ the deck earned on the strict reading. Treat the attribute profile as the useful
 output and the absolute number as this module's own scale, not DeckCheck's.
 """
 
+import itertools
 import math
 import re
 
@@ -78,7 +79,7 @@ def ladder(anchors: list, total: float) -> float:
     """
     if total <= anchors[0][0]:
         return anchors[0][1]
-    for (x0, y0), (x1, y1) in zip(anchors, anchors[1:]):
+    for (x0, y0), (x1, y1) in itertools.pairwise(anchors):
         if total <= x1:
             span = x1 - x0
             return y0 if span == 0 else y0 + (y1 - y0) * (total - x0) / span
@@ -403,9 +404,10 @@ def interaction(cards: list) -> dict:
 
         # Symmetric wipes cap the score, but a creature wipe in a deck with few
         # creatures is effectively one-sided and does not count toward the cap.
-        if _WIPE_RE.search(text) and not re.search(r"exile all|each opponent", text):
-            if not ("creature" in text and creature_count <= 8):
-                symmetric_wipes += 1
+        one_sided = ("creature" in text and creature_count <= 8)
+        if (_WIPE_RE.search(text) and not one_sided
+                and not re.search(r"exile all|each opponent", text)):
+            symmetric_wipes += 1
 
     count_score = ladder(COUNT_LADDER, pieces)
     stack_score = ladder(STACK_LADDER, stack_points)

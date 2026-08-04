@@ -559,7 +559,6 @@ def _target_outcome(target: int, result: dict) -> dict:
     which in practice means a two-card combo.
     """
     got = result["number"]
-    name = BRACKET_NAMES[target]
     crit = {c["key"]: c for c in result["criteria"]}
     unchecked = crit["combos"]["unchecked"]
     caveat = ("" if not unchecked else
