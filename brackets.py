@@ -464,13 +464,25 @@ def _criteria(cards: list, combos) -> list:
     else:
         two = combos.two_card
         early = combos.early
+        # Spellbook counts a combo whose third piece is described rather than
+        # named ("a persist creature") even when the deck holds no such card.
+        # Those are set aside in `combos.py`; saying so here is what stops the
+        # missing count reading as a bug.
+        missing = combos.unassembled
+        wanted = sorted({m for c in missing for m in c["missing"]})
+        one = len(missing) == 1
+        aside = ("" if not missing else
+                 f" {len(missing)} more "
+                 + ("needs a card" if one else "need cards")
+                 + f" this deck doesn't run ({_join(wanted)}), so "
+                 + ("it isn't" if one else "they aren't") + " counted.")
         out.append(Criterion(
             "combos", "Two-card combos", len(two),
             [" + ".join(c["cards"]) for c in two],
-            "None." if not two else
-            (f"{len(early)} of {len(two)} can go off before turn {EARLY_TURN}, "
-             "which brackets 1-3 don't allow." if early else
-             f"{len(two)}, all late-game — allowed from bracket 3 up."),
+            ("None." if not two else
+             (f"{len(early)} of {len(two)} can go off before turn {EARLY_TURN}, "
+              "which brackets 1-3 don't allow." if early else
+              f"{len(two)}, all late-game — allowed from bracket 3 up.")) + aside,
         ))
 
     # Speed is context at every bracket, so this note stays bracket-neutral; the
@@ -615,6 +627,8 @@ def evaluate(commander, deck: list, combos=None, *, fmt: str = "commander",
             "checked": bool(combos and combos.checked),
             "two_card": (combos.two_card if combos and combos.checked else []),
             "other": (combos.other if combos and combos.checked else [])[:5],
+            "unassembled": (combos.unassembled
+                            if combos and combos.checked else [])[:5],
         },
         # A deck can always be played *up*, and brackets 1 and 5 are statements
         # of intent that no decklist can settle.

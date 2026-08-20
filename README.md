@@ -93,10 +93,10 @@ Every Commander and Brawl deck is scored against WotC's bracket scale — 1 Exhi
 | Mass land denial | Rules-text detection (`brackets.py`), matching sweeps and standing locks but not spot land removal, one-off symmetric sacrifices, or wipes that spare lands |
 | Extra turns | Rules-text detection, separating one-shot spells from permanents that repeat |
 | Tutors | Rules-text detection, excluding land fetch — context only, see below |
-| Two-card infinite combos | [Commander Spellbook](https://commanderspellbook.com), which classifies each combo as two-card and reports how early it can go off |
+| Two-card infinite combos | [Commander Spellbook](https://commanderspellbook.com), which classifies each combo as two-card and reports how early it can go off — filtered here against the deck's own contents, see below |
 | Deck speed | Fast mana, free spells, cheap interaction and curve — this project's reading, advisory only |
 
-Current as of WotC's **February 9, 2026** beta update. The turn expectations arrived in the October 21, 2025 update, which also **removed the tutor guiderails from every bracket** — the efficient tutors are Game Changers and already counted, so tutors are reported here as context and gate nothing.
+Current as of WotC's **February 9, 2026** beta update. The turn expectations arrived in the October 21, 2025 update, which also **removed the tutor guiderails from every bracket** — the efficient tutors are Game Changers and already counted, so tutors are reported here as context and gate nothing. They still shape what gets *built*, though: see the tutor package under "Building to a bracket" below.
 
 Three limits worth knowing:
 
@@ -121,7 +121,9 @@ Its job here is the thing the card restrictions cannot see. A deck can obey ever
 
 The scale also runs low against DeckCheck's: they recalibrated so precons centre near 5, and precons measured here land near 3.75, because their scoring leans on a hand-curated card database while this reads rules text. The error direction is the safe one — scoring low means the floors fire *less* often, so this under-promotes rather than over-promotes. Across the 15 top commanders in the sample collection, no deck is bumped; a deliberately fast, restriction-clean burn deck is correctly bumped from 2 to 3.
 
-**Building to a bracket.** `--target-bracket N` on the CLI, or the target picker in the web UI's format panel, builds to a bracket instead of reporting one. It keeps out what that bracket disallows (Game Changers below 3, mass land denial and chained extra turns below 4) and seeds in the Game Changers that reach 3 and above — synergy scoring alone never picks them, since Farewell shares nothing with an Elemental commander. Two-card combos depend on which pairs end up together and are only known once Spellbook has answered, so they are reported against the target rather than built around, and the CLI says so when they push a deck past what you asked for.
+**Building to a bracket.** `--target-bracket N` on the CLI, or the target picker in the web UI's format panel, builds to a bracket instead of reporting one. It keeps out what that bracket disallows (Game Changers below 3, mass land denial and chained extra turns below 4) and seeds in the Game Changers that reach 3 and above — synergy scoring alone never picks them, since Farewell shares nothing with an Elemental commander. It also sizes the tutor package to the target: 8 slots at bracket 4 and 5, 3 at bracket 3 and by default, 2 at brackets 1 and 2. Bracket 4 means playing your best cards *every* game, which is a search question as much as a card-quality one — three tutors in a deck that owns Demonic Tutor is a good bracket 3 deck, and CRISPI's search ladder agrees: its Consistency column needs roughly eight live tutors to clear 8. Two-card combos depend on which pairs end up together and are only known once Spellbook has answered, so they are reported against the target rather than built around, and the CLI says so when they push a deck past what you asked for.
+
+**Combos are filtered against the deck that was actually built.** Spellbook describes some combo pieces by *template* — "a persist creature", "an artifact with mana value 0" — rather than by name, and counts those combos as present whether or not your deck can field one. A Celes, Rune Knight deck holding no persist creature was told it had an early two-card combo, and read as a bracket 4 on the strength of it. Each template carries the Scryfall query that defines it, so `scryfall_query.py` compiles that query and runs it over the deck's ~100 cards; a combo whose template matches nothing is listed as what it is ("1 more needs a card this deck doesn't run") and gates nothing. The query reader is deliberately partial — `otag:` and friends need Scryfall's tagger data this project does not hold — and a query it cannot read exactly reads as *met*, so the filter only ever removes combos it can prove the deck cannot assemble.
 
 The combo check is the only part that needs the network. The CLI skips it under `--no-recs`, and the web UI renders the bracket immediately from the local criteria and refines it when Spellbook answers. Either way an unchecked combo criterion is reported as unchecked rather than as clean, since a missed combo can only mean the real bracket is *higher*. Responses are cached under `.cache/combos/` for a week, keyed by deck contents.
 
@@ -214,6 +216,7 @@ magic_builder/
 ├── commander.py         # Commander candidate scoring and selection
 ├── brackets.py          # Commander bracket (1-5) estimation and its criteria
 ├── combos.py            # Two-card combo lookup via Commander Spellbook (.cache/combos/)
+├── scryfall_query.py    # Partial Scryfall-syntax reader, for combo template requirements
 ├── deck_builder.py      # 99-card singleton deck construction and synergy scoring
 ├── standard_builder.py  # 60-card constructed deck builder + sideboard
 ├── edhrec_recs.py       # EDHREC upgrade / acquisition recommendations (.cache/edhrec/)

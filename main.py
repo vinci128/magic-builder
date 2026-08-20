@@ -126,7 +126,7 @@ def main(collection_path: str, output: str, no_recs: bool, fmt: str, colors: str
     found = None
     if not no_recs:
         print("Checking for two-card combos...")
-        found = find_combos(commander.name, deck)
+        found = find_combos(commander.name, deck, commander=commander)
     score = crispi.evaluate(commander, deck, found)
     bracket = brackets.evaluate(commander, deck, found, fmt=fmt,
                                 target=target_bracket, crispi=score)

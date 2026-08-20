@@ -549,7 +549,8 @@ def bracket(sid: str, commander: str, fmt: str = "commander", refresh: bool = Fa
     if commander_card is None:
         raise HTTPException(404, f"{commander} isn't in this collection.")
 
-    found = combos.find_combos(commander, deck, refresh=refresh)
+    found = combos.find_combos(commander, deck, commander=commander_card,
+                               refresh=refresh)
     # The target came in on the build request, so it is read back from the
     # session rather than re-sent: the answer must be about the deck that was
     # actually built, not whatever the picker happens to say now.

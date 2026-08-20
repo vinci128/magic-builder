@@ -14,9 +14,24 @@ REMOVAL_TARGET = 8
 # Tutors are a role like the three above. Without a slot of their own they only
 # ever compete in the synergy fill, where they are scored on typal overlap with
 # the commander — so a creature tutor in a party deck loses its place to a
-# Guildgate. Small, because tutors are a tool and not a plan.
+# Guildgate. Small by default, because tutors are a tool and not a plan.
 TUTOR_TARGET = 3
+# ...but how many belong in a deck is a bracket question, which is the one
+# thing the default cannot express. Bracket 4 is "play your best cards, every
+# game": a deck that owns Demonic Tutor and runs three search effects total is
+# not optimized, it is a good bracket 3 deck, and CRISPI reads it that way —
+# its search ladder needs roughly eight live tutors before the Consistency
+# column clears 8. Brackets 1 and 2 lean the other way: finding the same card
+# every game is exactly what a casual table does not want to sit across from.
+TUTOR_TARGET_BY_BRACKET = {1: 2, 2: 2, 3: 3, 4: 8, 5: 8}
 # Remaining slots go to synergy/value cards
+
+
+def tutor_target(target_bracket: int | None) -> int:
+    """How many tutor slots a build aimed at `target_bracket` gets."""
+    if target_bracket is None:
+        return TUTOR_TARGET
+    return TUTOR_TARGET_BY_BRACKET.get(target_bracket, TUTOR_TARGET)
 
 BASIC_LAND_NAMES = {
     "W": "Plains",
@@ -526,7 +541,8 @@ def build_deck(commander: OwnedCard, owned_cards: list, fmt: str = "commander",
     ramp_cards    = pick([c for c in scored_non_lands if _is_ramp(c)],     RAMP_TARGET)
     draw_cards    = pick([c for c in scored_non_lands if _is_card_draw(c)], DRAW_TARGET)
     remove_cards  = pick([c for c in scored_non_lands if _is_removal(c)],   REMOVAL_TARGET)
-    tutor_cards   = pick(_by_tutor_quality(scored_non_lands),              TUTOR_TARGET)
+    tutor_cards   = pick(_by_tutor_quality(scored_non_lands),
+                         tutor_target(target_bracket))
     nonbasic_lands = pick(scored_lands, NONBASIC_LAND_TARGET)
     synergy_cards = pick(scored_non_lands, 99)  # pick() skips already-used ids
 
