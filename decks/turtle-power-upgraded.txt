@@ -1,5 +1,4 @@
 1 Leonardo, the Balance
-1 Michelangelo, the Heart
 1 Acidic Slime
 1 April O'Neil, Live on the Scene
 1 Arcade Cabinet
@@ -8,7 +7,6 @@
 1 Baxter, Fly in the Ointment
 1 Bebop, Skull & Crossbones
 1 Big Mother Mouser
-1 Biogenic Ooze
 1 Blasphemous Act
 1 Blitzball Stadium
 1 Casey Jones, Back Alley Brute
@@ -36,6 +34,7 @@
 1 Lessons from Life
 1 Level Up
 1 Lita, Little Orphan Amphibian
+1 Michelangelo, the Heart
 1 Mona Lisa, Science Geek
 1 Ninja Pizza
 1 Raphael, the Muscle
@@ -49,6 +48,7 @@
 1 Special Move
 1 Splinter, the Mentor
 1 Steelbane Hydra
+1 Summon: Knights of Round
 1 Super Combo
 1 Swift Demise
 1 Tempestra, Dame of Games

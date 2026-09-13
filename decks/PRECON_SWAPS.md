@@ -61,6 +61,7 @@ this pairing wrong in places (see Tempestra, below).
 | Krang, the All-Powerful (not listed) | **Rayblade Trooper** | ETB +1/+1 counter; whenever a countered creature dies, a Soldier token — with Leonardo, every creature is a countered creature. Warp for two. |
 | Rat King, Pale Piper (11%) | **Feed the Swarm** | Clean two-mana removal that also answers enchantments. |
 | Mole Module (7%) | **Blitzball Stadium** | Support X puts counters on the team; later makes a creature unblockable and draws a card per counter type — Michelangelo's Food and Leonardo's counters mean two kinds are easy. |
+| Biogenic Ooze (13%) | **Summon: Knights of Round** | Three Knight tokens on each of chapters I–IV, and Saga chapters trigger after the draw step — precombat — so for four turns Leonardo's team counter lands before combat. Chapter V: +2/+2 and an indestructible counter on everything (a second counter type for Blitzball Stadium; Raphael doubles the damage of all of it). Eight mana, so it's the finisher, not the curve. Biogenic Ooze is the same job done worse: one token, more at {1}{G}{G}{G} each, counters only on Oozes. |
 
 **Kept on purpose — Tempestra, Dame of Games.** She is on EDHREC's generic
 cut list for the precon, and the first draft of this list cut her. Wrong for
@@ -70,15 +71,14 @@ counters, precombat, on a hasty 4/4 with its own WUBRG activation — and a copy
 of Michelangelo is a second Raid. Leo // Mikey decks keep her at 27% against
 18% for Heroes in a Half Shell decks, which is the same conclusion in the data.
 Exploding Barrel also stays (29%; the deck needs its rocks for the WUBRG
-activation). Next cuts if you keep buying: Acidic Slime (11%), Biogenic Ooze
-(13%), Foot Chopper (17%), Harmonize (20%).
+activation). Next cuts if you keep buying: Acidic Slime (11%), Foot Chopper
+(17%), Harmonize (20%).
 
 Optional: Biosynthic Burst (counter + indestructible + untap, protects a
 commander for two), Drix Fatemaker, Selfcraft Mechan (sacrifice a Mutagen:
 counter + card), Guy in the Chair (any-colour dork for Leonardo's WUBRG
 activation), Thrumming Hivepool (two tokens every upkeep, a guaranteed
-precombat Leonardo trigger, but six mana), Summon: Knights of Round as an
-eight-mana finisher.
+precombat Leonardo trigger, for six — the cheaper cousin of Knights of Round).
 
 The scorer, run with `--precon-commanders "Leonardo, the Balance //
 Michelangelo, the Heart"`, agrees on Rayblade Trooper and Blitzball Stadium
@@ -103,9 +103,9 @@ Slash Clone); the list here is built from your binder.
 Optional: Charging Strifeknight (hasty 3/3 looter), Scorpion, Seething Striker
 (connive whenever a creature died), Key to the Side-Door (makes Terra
 unblockable so her damage trigger connects). The scorer also rates Summon:
-Knights of Round highly here on EDHREC's data (38% of Terra decks run it); it
-is eight mana, so it is left out of the list but is a fair finisher if the
-Turtles don't take it.
+Knights of Round highly here on EDHREC's data (38% of Terra decks run it), but
+the one copy went to the Turtles, where its precombat token chapters line up
+with Leonardo.
 
 ## What was checked
 
@@ -113,4 +113,4 @@ Turtles don't take it.
   deck's colour identity (script-verified, not eyeballed).
 - Each post-swap list is exactly 100 cards.
 - Cards were not double-booked across decks: Bitter Triumph → Terra, Feed the
-  Swarm → Turtles, Stone by Sunlight → Cloud.
+  Swarm → Turtles, Stone by Sunlight → Cloud, Summon: Knights of Round → Turtles.
