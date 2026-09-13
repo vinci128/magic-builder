@@ -141,10 +141,10 @@ the set's own legends are still under a dollar.
 Ground, Overgrown Tomb, ~$10–20 each) in place of the three Thriving lands, Ash
 Barrens and Evolving Wilds. Worth doing after the spells, not before.
 
-**What comes out** (beyond the five swaps already made): Biogenic Ooze, Krang,
-Rat King, Harmonize, Tokka & Rahzar, Everything Pizza, Big Mother Mouser, Fast
-Forward, Dimension X Pizzasaur, Continue? Endless Foot Assault, Lita, Here
-Comes a New Hero!, Foot Chopper.
+**What comes out** (beyond the five swaps already made, in order of how few
+Leo // Mikey decks keep them): Acidic Slime, Biogenic Ooze, Foot Chopper,
+Harmonize, Everything Pizza, Voracious Hydra, Tokka & Rahzar, Dimension X
+Pizzasaur, Fast Forward. Keep Tempestra — see PRECON_SWAPS.md.
 
 ---
 

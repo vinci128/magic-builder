@@ -1,4 +1,5 @@
 1 Leonardo, the Balance
+1 Michelangelo, the Heart
 1 Acidic Slime
 1 April O'Neil, Live on the Scene
 1 Arcade Cabinet
@@ -21,6 +22,7 @@
 1 Double Jump // Flying Kick
 1 Endless Foot Assault
 1 Everything Pizza
+1 Exploding Barrel
 1 Fast Forward
 1 Feed the Swarm
 1 Foot Chopper
@@ -30,16 +32,13 @@
 1 Heroes in a Half Shell
 1 High Score
 1 Irma, Part-Time Mutant
-1 Krang, the All-Powerful
 1 Leatherhead, Iron Gator
 1 Lessons from Life
 1 Level Up
 1 Lita, Little Orphan Amphibian
-1 Michelangelo, the Heart
 1 Mona Lisa, Science Geek
 1 Ninja Pizza
 1 Raphael, the Muscle
-1 Rat King, Pale Piper
 1 Ray Fillet, Wave Warrior
 1 Rayblade Trooper
 1 Rocksteady, Mutant Marauder
@@ -52,6 +51,7 @@
 1 Steelbane Hydra
 1 Super Combo
 1 Swift Demise
+1 Tempestra, Dame of Games
 1 Together Forever
 1 Tokka & Rahzar, Unsupervised
 1 Vanquish the Horde

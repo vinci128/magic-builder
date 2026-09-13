@@ -433,7 +433,7 @@ function renderPrecon(data) {
     const inn = li.querySelector(".swap-in");
     out.querySelector(".swap-name").textContent = swap.out.name;
     inn.querySelector(".swap-name").textContent = swap.in.name;
-    out.title = swap.out.type_line;
+    out.title = swap.out_reason ? `${swap.out.type_line}\n${swap.out_reason}` : swap.out.type_line;
     inn.title = `${swap.in.type_line} · score ${swap.score}`
       + (swap.binders.length ? ` · in binder ${swap.binders.join(", ")}` : "");
     attachPreview(out, swap.out.image_url);

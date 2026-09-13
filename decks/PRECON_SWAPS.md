@@ -50,13 +50,28 @@ are worth more than they look: they let Leonardo's team counters land before
 attacks instead of after. Donatello and Splinter are in the 99 and still do
 their thing when they are out, but nothing below depends on them.
 
-| Out | In | Why |
+Cuts are the precon cards the fewest Leo // Mikey decks on EDHREC keep — the
+generic precon cut list is measured across every Turtle Power build and gets
+this pairing wrong in places (see Tempestra, below).
+
+| Out (kept by … of Leo // Mikey decks) | In | Why |
 |---|---|---|
-| Electric Seaweed | **Silk, Web Weaver** | A token on every creature spell you cast — precombat, so Leonardo's counters go on before you attack instead of waiting for Michelangelo's Food. Web-slinging casts it for three by returning a tapped creature (a Mutagen-sacked one, say). Anthem activation for the alpha strike. |
-| Roadkill Rodney | **Weftstalker Ardent** | Pings every opponent whenever a creature *or artifact* enters — the Food every turn, every Mutagen, every Treasure. |
-| Tempestra, Dame of Games | **Rayblade Trooper** | ETB +1/+1 counter; whenever a countered creature dies, a Soldier token — with Leonardo, every creature is a countered creature. Warp for two. |
-| Exploding Barrel | **Feed the Swarm** | Clean two-mana removal that also answers enchantments. |
-| Mole Module | **Blitzball Stadium** | Support X puts counters on the team; later makes a creature unblockable and draws a card per counter type — Michelangelo's Food and Leonardo's counters mean two kinds are easy. |
+| Electric Seaweed (not listed) | **Silk, Web Weaver** | A token on every creature spell you cast — precombat, so Leonardo's counters go on before you attack instead of waiting for Michelangelo's Food. Web-slinging casts it for three by returning a tapped creature (a Mutagen-sacked one, say). Anthem activation for the alpha strike. |
+| Roadkill Rodney (21%) | **Weftstalker Ardent** | Pings every opponent whenever a creature *or artifact* enters — the Food every turn, every Mutagen, every Treasure. |
+| Krang, the All-Powerful (not listed) | **Rayblade Trooper** | ETB +1/+1 counter; whenever a countered creature dies, a Soldier token — with Leonardo, every creature is a countered creature. Warp for two. |
+| Rat King, Pale Piper (11%) | **Feed the Swarm** | Clean two-mana removal that also answers enchantments. |
+| Mole Module (7%) | **Blitzball Stadium** | Support X puts counters on the team; later makes a creature unblockable and draws a card per counter type — Michelangelo's Food and Leonardo's counters mean two kinds are easy. |
+
+**Kept on purpose — Tempestra, Dame of Games.** She is on EDHREC's generic
+cut list for the precon, and the first draft of this list cut her. Wrong for
+this pairing: sacrifice a Mutagen (or Food) and the token copy of Leonardo
+*entering* fires both Leonardos' once-per-turn triggers — two team-wide
+counters, precombat, on a hasty 4/4 with its own WUBRG activation — and a copy
+of Michelangelo is a second Raid. Leo // Mikey decks keep her at 27% against
+18% for Heroes in a Half Shell decks, which is the same conclusion in the data.
+Exploding Barrel also stays (29%; the deck needs its rocks for the WUBRG
+activation). Next cuts if you keep buying: Acidic Slime (11%), Biogenic Ooze
+(13%), Foot Chopper (17%), Harmonize (20%).
 
 Optional: Biosynthic Burst (counter + indestructible + untap, protects a
 commander for two), Drix Fatemaker, Selfcraft Mechan (sacrifice a Mutagen:

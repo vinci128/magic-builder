@@ -406,6 +406,7 @@ class Swap:
     inn: OwnedCard
     score: float
     reasons: list
+    out_reason: str = ""   # why this card is the one to cut
 
 
 @dataclass
@@ -582,6 +583,7 @@ def suggest_swaps(detected: Detected, owned: list, card_index: dict, *,
         # One entry per name, remembering every binder any printing sits in.
         pool.setdefault(key, []).append(card)
 
+    page_label = " // ".join(c.name for c in commanders)
     candidates: list[Candidate] = []
     locked = 0
     for key, printings in pool.items():
@@ -592,13 +594,13 @@ def suggest_swaps(detected: Detected, owned: list, card_index: dict, *,
             continue
         score, reasons = _score_candidate(
             card, commanders=commanders, adds=adds, page=page,
-            page_label=" // ".join(c.name for c in commanders), themes=themes,
+            page_label=page_label, themes=themes,
             needs=needs, removal_avg_cmc=removal_avg, tapped_lands=tapped, ci=ci)
         if score >= MIN_SWAP_SCORE and reasons:
             candidates.append(Candidate(card, round(score, 1), reasons, binders))
     candidates.sort(key=lambda c: (-c.score, -len(c.reasons), c.card.cmc, c.card.name))
 
-    outs_spells, outs_lands = _cuts(precon, deck, page, commander_keys)
+    outs_spells, outs_lands = _cuts(precon, deck, page, page_label, commander_keys)
 
     swaps: list[Swap] = []
     leftover: list[Candidate] = []
@@ -607,8 +609,8 @@ def suggest_swaps(detected: Detected, owned: list, card_index: dict, *,
         if len(swaps) >= limit or not outs:
             leftover.append(cand)
             continue
-        out = outs.pop(0)
-        swaps.append(Swap(out, cand.card, cand.score, cand.reasons))
+        out, why = outs.pop(0)
+        swaps.append(Swap(out, cand.card, cand.score, cand.reasons, why))
 
     after = [c for c in deck if name_key(c.name) not in {name_key(s.out.name) for s in swaps}]
     after += [s.inn for s in swaps]
@@ -681,39 +683,68 @@ def _acquisitions(precon: Precon, page: dict, card_index: dict, skip: set) -> li
     return out
 
 
-def _cuts(precon: Precon, deck: list, page: dict, commander_keys: set) -> tuple[list, list]:
-    """Cards to take out, weakest first, split into spells and lands.
+# Below this share of the commander's decks, a precon card is one the people
+# playing that commander have decided against.
+CUT_INCLUSION = 0.35
+# The commander page has to describe this much of the deck before its numbers
+# outrank the precon's generic most-cut list.
+CUT_PAGE_COVERAGE = 0.5
 
-    EDHREC's most-cut lists lead; when a list is short or missing, the rest is
-    filled from the precon's own cards — expensive spells the commander's page
-    does not vouch for, then lands that enter tapped for a single colour.
+
+def _cuts(precon: Precon, deck: list, page: dict, page_label: str,
+          commander_keys: set) -> tuple[list, list]:
+    """Cards to take out, weakest first, as [(card, reason)], spells and lands apart.
+
+    The commander page decides when it covers the deck: a precon card that few
+    of this commander's decks keep is the cut, whatever the precon's generic
+    most-cut list says — Tempestra is cut from most Turtle Power builds but
+    kept by the Leonardo // Michelangelo ones, where she copies a commander.
+    The generic list orders the rest, then mana value; lands follow EDHREC's
+    lands-to-cut list, then whatever enters tapped for a single colour.
     """
     by_key = {}
     for card in deck:
         by_key.setdefault(name_key(card.name), card)
+    generic = {name_key(n): i for i, n in enumerate(precon.cut)}
+    spells = [c for c in by_key.values() if not _is_land(c)
+              and name_key(c.name) not in commander_keys]
+    covered = sum(1 for c in spells if name_key(c.name) in page) / len(spells) if spells else 0
 
-    def from_names(names):
-        out = []
-        for name in names:
-            card = by_key.get(name_key(name))
-            if card is not None and card not in out and name_key(name) not in commander_keys:
-                out.append(card)
-        return out
-
-    spells = from_names(precon.cut)
-    lands = from_names(precon.lands_cut)
-
-    def vouched(card):
+    def keep_share(card):
         rec = page.get(name_key(card.name))
-        return rec is not None and rec.inclusion >= 0.30
+        # Absent from a page that covers the deck means too rare to be listed.
+        return rec.inclusion if rec is not None else 0.0
 
-    rest_spells = [c for c in by_key.values() if not _is_land(c) and c not in spells
-                   and not _is_basic_land(c) and not vouched(c)]
-    rest_spells.sort(key=lambda c: (-c.cmc, c.name))
-    rest_lands = [c for c in by_key.values() if _is_land(c) and c not in lands
-                  and not _is_basic_land(c) and _enters_tapped(c)]
-    rest_lands.sort(key=lambda c: (len(_land_colours(c)), c.name))
-    return spells + rest_spells, lands + rest_lands
+    ranked_spells: list[tuple[OwnedCard, str]] = []
+    if covered >= CUT_PAGE_COVERAGE:
+        for card in sorted(spells, key=lambda c: (keep_share(c), generic.get(name_key(c.name), 99),
+                                                  -c.cmc, c.name)):
+            share = keep_share(card)
+            if share >= CUT_INCLUSION and name_key(card.name) not in generic:
+                continue
+            why = (f"kept by {share:.0%} of {page_label} decks on EDHREC"
+                   if name_key(card.name) in page
+                   else f"too few {page_label} decks keep it to make EDHREC's list")
+            ranked_spells.append((card, why))
+    else:
+        listed = sorted((c for c in spells if name_key(c.name) in generic),
+                        key=lambda c: generic[name_key(c.name)])
+        ranked_spells = [(c, "on EDHREC's most-cut list for this precon") for c in listed]
+        rest = [c for c in spells if name_key(c.name) not in generic
+                and keep_share(c) < CUT_INCLUSION]
+        rest.sort(key=lambda c: (-c.cmc, c.name))
+        ranked_spells += [(c, f"{int(c.cmc)} mana, and the commander's page doesn't vouch for it")
+                          for c in rest]
+
+    lands_cut = {name_key(n): i for i, n in enumerate(precon.lands_cut)}
+    lands = [c for c in by_key.values() if _is_land(c) and not _is_basic_land(c)]
+    listed = sorted((c for c in lands if name_key(c.name) in lands_cut),
+                    key=lambda c: lands_cut[name_key(c.name)])
+    ranked_lands = [(c, "on EDHREC's lands-to-cut list for this precon") for c in listed]
+    rest = [c for c in lands if name_key(c.name) not in lands_cut and _enters_tapped(c)]
+    rest.sort(key=lambda c: (len(_land_colours(c)), c.name))
+    ranked_lands += [(c, "enters tapped") for c in rest]
+    return ranked_spells, ranked_lands
 
 
 def _evaluate(commander: OwnedCard, deck: list) -> dict:
@@ -772,7 +803,8 @@ def format_report(results: list, per_tier: int = 8) -> str:
             lines.append("Nothing you own clears the bar for this deck — what it has "
                          "is already the best fit in the collection.")
         for i, swap in enumerate(result["swaps"], 1):
-            lines.append(f"{i:>2}. OUT  {swap.out.name}")
+            lines.append(f"{i:>2}. OUT  {swap.out.name}"
+                         + (f"  — {swap.out_reason}" if swap.out_reason else ""))
             lines.append(f"    IN   {swap.inn.name}  [{swap.inn.mana_cost or 'land'}]  "
                          f"score {swap.score}")
             for reason in swap.reasons[:3]:

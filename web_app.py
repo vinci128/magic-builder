@@ -682,6 +682,7 @@ def precon_swaps(sid: str, slug: str, limit: int = 8, include_deck_cards: bool =
             "in": _card_json(swap.inn, 1),
             "score": swap.score,
             "reasons": swap.reasons,
+            "out_reason": swap.out_reason,
             "binders": sorted(swap.inn.binders),
         }
 
