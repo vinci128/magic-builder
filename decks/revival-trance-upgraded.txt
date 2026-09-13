@@ -61,7 +61,6 @@
 1 Umbral Collar Zealot
 1 Wayfarer's Bauble
 1 Zombify
-1 Ash Barrens
 1 Battlefield Forge
 1 Clifftop Retreat
 1 Command Tower
@@ -77,6 +76,7 @@
 1 Graven Cairns
 1 High Market
 1 Isolated Chapel
+1 Midgar, City of Mako // Reactor Raid
 3 Mountain
 1 Nomad Outpost
 1 Path of Ancestry

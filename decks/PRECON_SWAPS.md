@@ -99,6 +99,7 @@ Slash Clone); the list here is built from your binder.
 | Interceptor, Shadow's Hound | **Umbral Collar Zealot** | 3/2 for two with a free sacrifice outlet that surveils — fills the graveyard, and at power 3 Terra brings it back. |
 | Ruin Grinder | **Ahriman** | Flying deathtouch, sacrifice a creature or artifact to draw; power 2, so it loops with Terra. |
 | Umaro, Raging Yeti | **Bitter Triumph** | Two-mana instant removal whose discard cost puts a creature in the graveyard for Terra. |
+| Ash Barrens | **Midgar, City of Mako // Reactor Raid** | A land slot that is also a spell: Reactor Raid ({2}{B}) sacrifices a creature or artifact to draw two — the creature is one Terra returns anyway, and the death feeds Morbid Opportunist and Pitiless Plunderer — then the land is played from exile. Enters tapped for black, like the Ash Barrens it replaces. |
 
 Optional: Charging Strifeknight (hasty 3/3 looter), Scorpion, Seething Striker
 (connive whenever a creature died), Key to the Side-Door (makes Terra

@@ -92,7 +92,7 @@ Memory, Bronze Guardian, Inspiring Statuary, Hero's Heirloom, Harmonize.
 | Sister Hospitaller | $12.94 | 23% · 43% | Reanimate anything on entry, gain its mana value |
 | Sephiroth, Fabled SOLDIER | $28.86 | 10% · 18% | Sacrifice engine that drains and flips into a board wipe; optional |
 
-**What comes out** (beyond the four swaps already made): Combustible
+**What comes out** (beyond the five swaps already made): Combustible
 Gearhulk, Sepulchral Primordial, Rejoin the Fight, Key to the City, Millikin,
 Coin of Fate, then Snort and Meteor Golem last.
 
