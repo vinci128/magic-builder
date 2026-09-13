@@ -25,6 +25,7 @@ import brackets
 import combos
 import crispi
 import formats
+import precons
 from arena_collection import detect_collection_format, load_owned_cards
 from card_data import load_scryfall_lookup, load_by_name, enrich_collection, name_key
 from commander import find_commanders
@@ -605,6 +606,104 @@ def recommendations(sid: str, commander: str, limit: int = 20, refresh: bool = F
         "upgrades": [_rec_json(r) for r in result["upgrades"]],
         "acquire": acquire,
         "acquire_price": round(sum(r["price"] for r in acquire), 2),
+    }
+
+
+# ── Precons ──────────────────────────────────────────────────────────────────
+
+def _detected_precons(session: dict, refresh: bool = False) -> list:
+    found = session.get("precons")
+    if found is None or refresh:
+        try:
+            found = precons.detect(session["owned"], refresh=refresh)
+        except Exception as exc:  # EDHREC unreachable on a cold cache
+            raise HTTPException(503, f"Could not reach EDHREC's precon index: {exc}")
+        session["precons"] = found
+    return found
+
+
+def _precon_json(det) -> dict:
+    info = det.precon.info
+    # EDHREC counts any deck filed under the precon, including ones re-helmed
+    # by a commander from elsewhere; only pairings the list can field are offered.
+    listed = {name_key(n) for n, _ in det.precon.cards}
+    pairings = [p for p in det.precon.pairings
+                if all(name_key(n) in listed for n in p["commanders"])]
+    return {
+        "slug": info.slug,
+        "name": info.name,
+        "series": info.series,
+        "commanders": det.precon.commanders,
+        "coverage": round(det.coverage, 3),
+        "binder": det.binder,
+        "missing": det.missing,
+        "image": info.image,
+        "pairings": pairings[:8],
+    }
+
+
+@app.get("/api/collection/{sid}/precons")
+def list_precons(sid: str, refresh: bool = False):
+    """The preconstructed Commander decks this collection contains."""
+    session = _session(sid)
+    return {"precons": [_precon_json(d) for d in _detected_precons(session, refresh)]}
+
+
+@app.get("/api/collection/{sid}/precons/{slug}/swaps")
+def precon_swaps(sid: str, slug: str, limit: int = 8, include_deck_cards: bool = False,
+                 commanders: str | None = None):
+    """What to take out of a detected precon, and what you own to put in.
+
+    `commanders` picks who helms it (`A // B` for partners); default is
+    EDHREC's listing for the precon.
+    """
+    session = _session(sid)
+    found = _detected_precons(session)
+    det = next((d for d in found if d.precon.info.slug == slug), None)
+    if det is None:
+        raise HTTPException(404, "That precon wasn't found in this collection.")
+
+    names = [n.strip() for n in (commanders or "").split("//") if n.strip()]
+    listed = {name_key(n) for n, _ in det.precon.cards}
+    if any(name_key(n) not in listed for n in names):
+        raise HTTPException(400, "Those commanders aren't in this precon.")
+
+    reserved = {d.binder for d in found if d.binder}
+    result = precons.suggest_swaps(det, session["owned"], load_by_name(), limit=limit,
+                                   reserved_binders=reserved,
+                                   include_deck_cards=include_deck_cards,
+                                   commander_names=names or None)
+    if result.get("error"):
+        raise HTTPException(422, result["error"])
+
+    def swap_json(swap):
+        return {
+            "out": _card_json(swap.out, 1),
+            "in": _card_json(swap.inn, 1),
+            "score": swap.score,
+            "reasons": swap.reasons,
+            "binders": sorted(swap.inn.binders),
+        }
+
+    return {
+        "precon": _precon_json(det),
+        "commanders": [_card_json(c, 1) for c in result["commanders"]],
+        "colors": [c for c in "WUBRG" if any(c in x.color_identity for x in result["commanders"])],
+        "themes": result["themes"],
+        "before": result["before_eval"],
+        "after": result["after_eval"],
+        "swaps": [swap_json(s) for s in result["swaps"]],
+        "more": [
+            {**_card_json(c.card, 1), "score": c.score, "reasons": c.reasons,
+             "binders": c.binders}
+            for c in result["more"]
+        ],
+        "locked": result["locked"],
+        "acquire": result["acquire"],
+        "tiers": [label for _, _, label in precons.PRICE_TIERS],
+        "deck_size": len(result["deck"]) + len(result["commanders"]),
+        "decklist_before": precons.decklist_text(result["commanders"], result["deck"]),
+        "decklist_after": precons.decklist_text(result["commanders"], result["after"]),
     }
 
 

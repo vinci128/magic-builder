@@ -9,6 +9,10 @@ class OwnedCard:
     quantity: int
     foil: bool = False
     set_name: str = ""
+    set_code: str = ""  # lowercase Scryfall set code of this printing, when the source has it
+    # ManaBox binder/deck name -> copies of this printing in it; how precons.py
+    # tells a card already sleeved in another deck from a loose one.
+    binders: dict = field(default_factory=dict)
     # Enriched from Scryfall
     color_identity: list = field(default_factory=list)
     type_line: str = ""
@@ -35,6 +39,7 @@ def parse_collection(csv_path: str) -> list:
             if not sid:
                 continue
             qty = int(row.get("Quantity", 1))
+            binder = (row.get("Binder Name") or "").strip()
             if sid in cards:
                 cards[sid].quantity += qty
             else:
@@ -44,5 +49,8 @@ def parse_collection(csv_path: str) -> list:
                     quantity=qty,
                     foil=row.get("Foil", "normal").strip().lower() == "foil",
                     set_name=row.get("Set name", "").strip(),
+                    set_code=(row.get("Set code") or "").strip().lower(),
                 )
+            if binder:
+                cards[sid].binders[binder] = cards[sid].binders.get(binder, 0) + qty
     return list(cards.values())

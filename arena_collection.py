@@ -36,6 +36,7 @@ def parse_arena_collection(path: str, scryfall_by_set_cn: dict) -> list:
                     scryfall_id=sid,
                     quantity=qty,
                     set_name=data.get("set_name", ""),
+                    set_code=data.get("set", ""),
                 )
 
     if missing:
@@ -85,6 +86,7 @@ def parse_arena_log_csv(path: str, scryfall_by_set_cn: dict) -> list:
                     scryfall_id=sid,
                     quantity=qty,
                     set_name=data.get("set_name", ""),
+                    set_code=data.get("set", ""),
                 )
 
     if missing:

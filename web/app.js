@@ -16,6 +16,9 @@ const state = {
   colors: new Set(),    // forced colours for constructed formats
   targetBracket: null,  // build to this bracket, null = wherever it lands
   deck: null,
+  precon: null,         // swap report for the precon currently on the stage
+  preconList: [],       // detected precons, with EDHREC's pairings for each
+  pairing: "",          // "A // B" chosen for the precon on the stage, "" = EDHREC default
 };
 
 // What asking for each bracket actually does to the build. Mirrors the
@@ -98,6 +101,7 @@ async function upload(file) {
     $("build-panel").hidden = false;
     $("build-panel").classList.add("enter");
     loadCommanders();
+    loadPrecons();
   } catch (err) {
     showError("upload-error", err.message);
   } finally {
@@ -286,13 +290,286 @@ function setWorking(on, text = "") {
     $("working-text").textContent = text;
     $("empty").hidden = true;
     $("deck").hidden = true;
+    $("precon").hidden = true;
   }
 }
+
+// ── Precons ─────────────────────────────────────────────────────────────────
+
+async function loadPrecons() {
+  const panel = $("precon-panel");
+  const list = $("precon-list");
+  panel.hidden = false;
+  list.replaceChildren();
+  $("precon-deck-cards-wrap").hidden = true;
+  $("precon-note").textContent = "Checking the collection against EDHREC's precon lists…";
+  state.precon = null;
+
+  try {
+    const res = await fetch(`/api/collection/${state.collectionId}/precons`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Precon lookup failed.");
+    if (!data.precons.length) {
+      // No precon, no panel: it would only say so.
+      panel.hidden = true;
+      return;
+    }
+    state.preconList = data.precons;
+    $("precon-note").textContent = data.precons.length === 1
+      ? "One preconstructed deck is in this collection. Pick it to see what you own that beats what it runs."
+      : `${data.precons.length} preconstructed decks are in this collection. Pick one to see what you own that beats what it runs.`;
+    data.precons.forEach((precon) => {
+      const btn = document.createElement("button");
+      btn.className = "cmd precon-btn";
+      btn.dataset.slug = precon.slug;
+      btn.innerHTML = `<span class="cmd-name"></span>
+        <span class="cmd-meta"><span class="cmd-score">${Math.round(precon.coverage * 100)}%</span></span>
+        <span class="precon-sub"></span>`;
+      btn.querySelector(".cmd-name").textContent = precon.name;
+      btn.querySelector(".precon-sub").textContent = precon.binder
+        ? `${precon.series} · binder “${precon.binder}”`
+        : precon.series;
+      btn.title = `${Math.round(precon.coverage * 100)}% of the list is in the collection`
+        + (precon.missing.length ? `\nNot found: ${precon.missing.join(", ")}` : "");
+      btn.addEventListener("click", () => {
+        list.querySelectorAll(".cmd").forEach((c) => c.classList.toggle("is-on", c === btn));
+        state.pairing = "";
+        loadPreconSwaps(precon.slug);
+      });
+      list.append(btn);
+    });
+    $("precon-deck-cards-wrap").hidden = data.precons.length < 2;
+  } catch (err) {
+    $("precon-note").textContent = err.message;
+  }
+}
+
+$("opt-precon-deck-cards").addEventListener("change", () => {
+  if (state.precon) loadPreconSwaps(state.precon.precon.slug);
+});
+
+async function loadPreconSwaps(slug) {
+  showError("build-error", "");
+  setWorking(true, "Reading the precon and scoring your cards against it…");
+  const include = $("opt-precon-deck-cards").checked;
+  const pairing = state.pairing ? `&commanders=${encodeURIComponent(state.pairing)}` : "";
+  try {
+    const res = await fetch(
+      `/api/collection/${state.collectionId}/precons/${encodeURIComponent(slug)}/swaps?include_deck_cards=${include}${pairing}`
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Could not score the precon.");
+    state.precon = data;
+    renderPrecon(data);
+  } catch (err) {
+    showError("build-error", err.message);
+    $("empty").hidden = false;
+  } finally {
+    setWorking(false);
+  }
+}
+
+function renderPrecon(data) {
+  $("empty").hidden = true;
+  $("deck").hidden = true;
+  const article = $("precon");
+  article.hidden = false;
+  article.classList.remove("enter");
+  void article.offsetWidth;
+  article.classList.add("enter");
+
+  $("precon-kicker").textContent = `${data.precon.series} · precon`;
+  $("precon-name").textContent = data.precon.name;
+  const commanders = data.commanders.map((c) => c.name).join(" // ");
+  $("precon-type").textContent = data.precon.binder
+    ? `${commanders} · ${data.deck_size} cards in binder “${data.precon.binder}”`
+    : `${commanders} · stock list`;
+  if (data.commanders[0]) attachPreview($("precon-name"), data.commanders[0].image_url);
+  $("precon-identity").innerHTML = pips(data.colors);
+  renderPairings(data);
+
+  const themes = $("precon-themes");
+  themes.replaceChildren();
+  if (!data.themes.length) {
+    themes.innerHTML = '<span class="curve-label">No recurring mechanic stands out.</span>';
+  }
+  data.themes.forEach((t) => {
+    const chip = document.createElement("span");
+    chip.className = "theme-chip";
+    chip.innerHTML = `<b></b><i>${Math.round(t.share * 100)}%</i>`;
+    chip.querySelector("b").textContent = t.label;
+    chip.title = `${t.label}: in ${Math.round(t.share * 100)}% of the deck's rules text`;
+    themes.append(chip);
+  });
+
+  const evalBox = $("precon-eval");
+  evalBox.replaceChildren();
+  [["Stock", data.before], ["After swaps", data.after]].forEach(([label, ev]) => {
+    const cell = document.createElement("div");
+    cell.innerHTML = `<dt></dt><dd><span class="eval-bracket"></span><span class="eval-crispi"></span></dd>`;
+    cell.querySelector("dt").textContent = label;
+    cell.querySelector(".eval-bracket").textContent = `Bracket ${ev.bracket} · ${ev.bracket_name}`;
+    cell.querySelector(".eval-crispi").textContent = `CRISPI ${ev.crispi.toFixed(2)}`;
+    cell.title = `${ev.line}\n${ev.crispi_summary}`;
+    evalBox.append(cell);
+  });
+
+  $("swap-count").textContent = data.swaps.length ? `(${data.swaps.length})` : "";
+  $("swap-note").textContent = data.swaps.length
+    ? "Out of the deck on the left, in from your collection on the right. Cuts follow EDHREC's most-cut list for this precon; each card you own is scored on EDHREC's upgrade data, the commander's page, the deck's own mechanics and the roles it is short on."
+    : "Nothing you own clears the bar for this deck — what it runs is already the best fit in the collection.";
+
+  const list = $("swap-list");
+  list.replaceChildren();
+  data.swaps.forEach((swap) => {
+    const li = document.createElement("li");
+    li.className = "swap enter";
+    li.innerHTML = `
+      <div class="swap-card swap-out"><span class="swap-tag">out</span><span class="swap-name"></span><span class="swap-cmc">${swap.out.mana_cost || ""}</span></div>
+      <span class="swap-arrow">→</span>
+      <div class="swap-card swap-in"><span class="swap-tag">in</span><span class="swap-name"></span><span class="swap-cmc">${swap.in.mana_cost || ""}</span></div>
+      <ul class="swap-reasons"></ul>`;
+    const out = li.querySelector(".swap-out");
+    const inn = li.querySelector(".swap-in");
+    out.querySelector(".swap-name").textContent = swap.out.name;
+    inn.querySelector(".swap-name").textContent = swap.in.name;
+    out.title = swap.out.type_line;
+    inn.title = `${swap.in.type_line} · score ${swap.score}`
+      + (swap.binders.length ? ` · in binder ${swap.binders.join(", ")}` : "");
+    attachPreview(out, swap.out.image_url);
+    attachPreview(inn, swap.in.image_url);
+    const reasons = li.querySelector(".swap-reasons");
+    swap.reasons.slice(0, 3).forEach((text) => {
+      const r = document.createElement("li");
+      r.textContent = text;
+      reasons.append(r);
+    });
+    list.append(li);
+  });
+
+  const more = $("swap-more");
+  more.hidden = !data.more.length;
+  const moreList = $("swap-more-list");
+  moreList.replaceChildren();
+  data.more.forEach((card) => {
+    const row = document.createElement("div");
+    row.className = "rec";
+    row.innerHTML = `<span class="rec-role">${card.score}</span><span class="rec-name"></span><span class="rec-price">${card.mana_cost || ""}</span>`;
+    row.querySelector(".rec-name").textContent = card.name;
+    row.title = `${card.type_line}\n${card.reasons.join("\n")}`;
+    attachPreview(row, card.image_url);
+    moreList.append(row);
+  });
+
+  renderBuylist(data);
+
+  const locked = $("swap-locked");
+  locked.hidden = !data.locked;
+  locked.textContent = data.locked
+    ? `${data.locked} candidate${data.locked === 1 ? "" : "s"} left alone because ${data.locked === 1 ? "it sits" : "they sit"} in another of your precons — tick the box on the left to consider them.`
+    : "";
+
+  article.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// EDHREC's popular pairings for the precon, most played first. The default
+// option is whatever EDHREC files the precon under; a partner precon is
+// usually played as a pair that is not that.
+function renderPairings(data) {
+  const wrap = $("precon-pairing-wrap");
+  const select = $("precon-pairing");
+  const pairings = data.precon.pairings || [];
+  const current = data.commanders.map((c) => c.name).join(" // ");
+  wrap.hidden = pairings.length < 2;
+  if (wrap.hidden) return;
+  select.replaceChildren();
+  const seen = new Set();
+  const options = [{ commanders: data.precon.commanders, decks: null }, ...pairings];
+  options.forEach((p) => {
+    const value = p.commanders.join(" // ");
+    if (seen.has(value)) return;
+    seen.add(value);
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = p.decks ? `${value} · ${p.decks.toLocaleString()} decks` : `${value} · EDHREC default`;
+    if (value === current) opt.selected = true;
+    select.append(opt);
+  });
+}
+
+$("precon-pairing").addEventListener("change", () => {
+  if (!state.precon) return;
+  state.pairing = $("precon-pairing").value;
+  loadPreconSwaps(state.precon.precon.slug);
+});
+
+// One column per price tier, most-demanded first, so a budget reads top to
+// bottom and a wallet reads left to right.
+function renderBuylist(data) {
+  const section = $("buylist");
+  const grid = $("buylist-grid");
+  grid.replaceChildren();
+  const acquire = data.acquire || [];
+  section.hidden = !acquire.length;
+  if (!acquire.length) return;
+  data.tiers.forEach((tier) => {
+    const cards = acquire.filter((a) => a.tier === tier).slice(0, 10);
+    if (!cards.length) return;
+    const col = document.createElement("section");
+    col.className = "rec-col is-buy enter";
+    const total = cards.reduce((sum, a) => sum + a.price, 0);
+    col.innerHTML = `<div class="rec-head"><h4></h4><p></p></div>`;
+    col.querySelector("h4").textContent = `${tier} (${cards.length})`;
+    col.querySelector("p").textContent = `${money(total)} for all ${cards.length}`;
+    cards.forEach((a) => {
+      const row = document.createElement("div");
+      row.className = "rec";
+      const pct = Math.round(a.added * 100);
+      row.innerHTML = `<span class="rec-role">${a.game_changer ? "GC" : ""}</span>
+        <span class="rec-name"></span>
+        <span class="rec-price">${money(a.price)}</span>
+        <span class="rec-bar"><i><span style="width:${Math.min(pct, 100)}%"></span></i>${Math.round(a.run * 100)}%</span>`;
+      row.querySelector(".rec-name").textContent = a.name;
+      row.title = `${a.type_line} · ${money(a.price)}\nAdded to ${pct}% of upgraded lists · run in ${Math.round(a.run * 100)}% of the commander's decks · synergy ${a.synergy >= 0 ? "+" : ""}${a.synergy.toFixed(2)}`
+        + (a.game_changer ? "\nGame Changer — moves the deck to bracket 3" : "");
+      attachPreview(row, a.image_url);
+      col.append(row);
+    });
+    grid.append(col);
+  });
+}
+
+$("copy-buylist").addEventListener("click", async () => {
+  if (!state.precon || !state.precon.acquire) return;
+  const lines = state.precon.tiers.flatMap((tier) => {
+    const cards = state.precon.acquire.filter((a) => a.tier === tier).slice(0, 10);
+    return cards.length ? [`# ${tier}`, ...cards.map((a) => `1 ${a.name}  (${money(a.price)})`), ""] : [];
+  });
+  await navigator.clipboard.writeText(lines.join("\n"));
+  flash($("copy-buylist"), "Copied");
+});
+
+$("copy-precon-after").addEventListener("click", async () => {
+  if (!state.precon) return;
+  await navigator.clipboard.writeText(state.precon.decklist_after);
+  flash($("copy-precon-after"), "Copied");
+});
+
+$("download-precon-after").addEventListener("click", () => {
+  if (!state.precon) return;
+  const blob = new Blob([state.precon.decklist_after], { type: "text/plain" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `${state.precon.precon.slug}-after-swaps.txt`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+});
 
 // ── Deck rendering ──────────────────────────────────────────────────────────
 
 function renderDeck(deck) {
   $("empty").hidden = true;
+  $("precon").hidden = true;
   $("deck").hidden = false;
   $("deck").classList.remove("enter");
   void $("deck").offsetWidth;

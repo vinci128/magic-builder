@@ -83,6 +83,24 @@ Output is printed to the console and saved as:
 - `deck_output.txt` — formatted deck list with sections
 - `deck_output.decklist.txt` — plain `1 Card Name` import format for MTGO/Arena/Moxfield
 
+### Precons
+
+```bash
+# Find the preconstructed Commander decks in a collection and suggest swaps
+python main.py ManaBox_Collection.csv --precons
+
+# ...also drawing on cards sleeved in your other precons
+python main.py ManaBox_Collection.csv --precons --include-deck-cards
+
+# ...scored for the commander(s) you actually play (partner precons especially)
+python main.py ManaBox_Collection.csv --precons \
+  --precon-commanders "Leonardo, the Balance // Michelangelo, the Heart"
+```
+
+`--precons` answers a different question with the same file: which precons do you own, and what of yours should go into each? Detection runs against EDHREC's precon index (every Commander precon back to 2011, with its list) — a precon counts as owned when 90% of its list is in the collection, or 50% when a ManaBox binder carries its name, in which case the binder's contents are treated as the deck rather than the stock list. Each card you own that fits the colours is then scored on four things: EDHREC's upgrade guide for that precon (what other players add), the commander's own EDHREC page, the deck's mechanical themes (phrases that recur in its rules text, reminder text excluded, weighted up when the commander's text expresses them) and the roles it is thin on (cheap ramp, draw, removal). Cuts follow EDHREC's most-cut list, with a cost-based fallback. Cards that live only in another detected precon's binder are left alone unless `--include-deck-cards` is set. `--precon-commanders` names who helms the deck (`A // B` for partners) — it changes which commander text sets the themes and which EDHREC page is consulted; the web UI offers EDHREC's popular pairings for each precon in a selector.
+
+Each report ends with a **worth buying** section: cards you don't own that other players put in the deck, priced at Scryfall's cheapest printing and grouped into tiers (under $1, $1–3, $3–10, $10+), ranked by how often EDHREC's upgraded lists add them. Output is `precon_swaps.txt` plus one `precon_swaps.<slug>.decklist.txt` per precon — the list after the swaps, ready to import. `decks/PRECON_SWAPS.md` holds a hand-reviewed pass over the same pool for the three precons in the September 2026 collection and notes where it disagrees with the scorer; `decks/PRECON_BUYLIST.md` groups the buy list into budget packages.
+
 ## Commander brackets
 
 Every Commander and Brawl deck is scored against WotC's bracket scale — 1 Exhibition, 2 Core, 3 Upgraded, 4 Optimized, 5 cEDH — and reported with the cards that decided it. Each bracket pairs an expected game length (9+, 8+, 6+, 4+ turns, then any) with a list of what a deck may contain, so the panel shows every criterion and marks the ones that fired:
@@ -129,7 +147,7 @@ The combo check is the only part that needs the network. The CLI skips it under 
 
 ## Web UI
 
-A browser front end for the same builders: drop in a collection file, pick one of the four formats and a commander or a colour pair, get the named deck back with its paper price, mana curve, pip demand, sideboard, card art on hover, and copy/download buttons. Commander and Brawl decks then load a **What other players run** section — EDHREC's upgrades and acquisitions, each tagged Staple / Flex / Tech and priced.
+A browser front end for the same builders: drop in a collection file, pick one of the four formats and a commander or a colour pair, get the named deck back with its paper price, mana curve, pip demand, sideboard, card art on hover, and copy/download buttons. Commander and Brawl decks then load a **What other players run** section — EDHREC's upgrades and acquisitions, each tagged Staple / Flex / Tech and priced. When the collection contains a precon, a **Precons you own** panel appears in the rail; picking one shows its themes, bracket and CRISPI before and after, the swaps with their reasons, and a copy/download of the post-swap list.
 
 ```bash
 python web_app.py             # http://127.0.0.1:8000
@@ -146,6 +164,8 @@ The Scryfall database loads once in the background at startup — the header sho
 | `POST /api/collection/{id}/deck/commander` | Build a 100-card singleton deck (`commander_name`, `fmt`: commander \| brawl, `target_bracket`: 1-5) |
 | `POST /api/collection/{id}/deck/standard` | Build a 60-card deck plus sideboard (`colors`, `fmt`: standard \| pauper) |
 | `GET /api/collection/{id}/recommendations` | EDHREC upgrades and acquisitions for a built deck (`commander`, `limit`, `refresh`) |
+| `GET /api/collection/{id}/precons` | Preconstructed decks detected in the collection (`refresh`) |
+| `GET /api/collection/{id}/precons/{slug}/swaps` | Swaps for one detected precon: cuts, cards you own to put in, themes, bracket before/after, and the post-swap list (`limit`, `include_deck_cards`, `commanders` as `A // B`) |
 
 Collections live in memory only — nothing is written to disk, and the 20 most recent uploads are kept.
 
@@ -220,6 +240,8 @@ magic_builder/
 ├── deck_builder.py      # 99-card singleton deck construction and synergy scoring
 ├── standard_builder.py  # 60-card constructed deck builder + sideboard
 ├── edhrec_recs.py       # EDHREC upgrade / acquisition recommendations (.cache/edhrec/)
+├── precons.py           # Precon detection (EDHREC's precon index) and swap suggestions
+├── decks/               # Hand-reviewed precon swaps and post-swap import lists
 ├── output.py            # Console and file formatting
 ├── mcp_server.py        # FastMCP server exposing tools to Claude
 ├── web_app.py           # FastAPI web UI + JSON API

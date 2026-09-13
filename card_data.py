@@ -309,5 +309,7 @@ def enrich_collection(owned_cards: list, scryfall_lookup: dict):
         card.image_url = data.get("image_uris") or front.get("image_uris") or ""
         card.price_usd = data.get("price_usd") or 0.0
         card.game_changer = data.get("game_changer") is True
+        if not card.set_code:
+            card.set_code = data.get("set", "")
     if missing:
         print(f"  Warning: {missing} card(s) not found in Scryfall data (may be very new prints).")

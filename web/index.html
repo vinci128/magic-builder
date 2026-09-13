@@ -44,6 +44,16 @@
       </div>
     </section>
 
+    <section class="panel" id="precon-panel" hidden>
+      <h2 class="panel-title">Precons you own</h2>
+      <p class="pane-note" id="precon-note">Checking the collection against EDHREC's precon lists…</p>
+      <div class="cmd-list" id="precon-list"></div>
+      <label class="check" id="precon-deck-cards-wrap" hidden>
+        <input type="checkbox" id="opt-precon-deck-cards">
+        <span>Also consider cards sleeved in your other precons <em>(moving them breaks that deck)</em></span>
+      </label>
+    </section>
+
     <section class="panel" id="build-panel" hidden>
       <h2 class="panel-title">2 · Format</h2>
 
@@ -109,6 +119,67 @@
       <div class="working-bar"><i></i></div>
       <p id="working-text">Building…</p>
     </div>
+
+    <article class="deck precon" id="precon" hidden>
+      <div class="plate">
+        <div class="plate-rows">
+          <p class="plate-kicker" id="precon-kicker">Precon</p>
+          <h2 class="plate-name" id="precon-name"></h2>
+          <p class="plate-type" id="precon-type"></p>
+        </div>
+        <div class="plate-pips" id="precon-identity"></div>
+      </div>
+
+      <label class="pairing" id="precon-pairing-wrap" hidden>
+        <span class="target-label">Helmed by</span>
+        <select id="precon-pairing"></select>
+        <span class="pane-note">EDHREC's popular pairings for this precon — the swaps are scored against the one you play.</span>
+      </label>
+
+      <div class="readout">
+        <div class="figure">
+          <div class="figure-head">
+            <h3>What the deck is about</h3>
+            <p class="figure-note">Mechanics that recur in its rules text — what a swap has to speak to</p>
+          </div>
+          <div class="theme-chips" id="precon-themes"></div>
+        </div>
+        <div class="figure">
+          <div class="figure-head">
+            <h3>Before and after</h3>
+            <p class="figure-note">Bracket and CRISPI, stock list against the swaps below</p>
+          </div>
+          <dl class="before-after" id="precon-eval"></dl>
+        </div>
+      </div>
+
+      <section class="swaps">
+        <div class="figure-head">
+          <h3>Swaps <span id="swap-count"></span></h3>
+          <p class="figure-note" id="swap-note"></p>
+        </div>
+        <ol class="swap-list" id="swap-list"></ol>
+        <div class="swap-more" id="swap-more" hidden>
+          <h4>Also worth a look</h4>
+          <div id="swap-more-list"></div>
+        </div>
+        <p class="pane-note" id="swap-locked" hidden></p>
+      </section>
+
+      <section class="buylist" id="buylist" hidden>
+        <div class="figure-head">
+          <h3>Worth buying</h3>
+          <p class="figure-note">Cards you don't own that other players put in this deck, by price — Scryfall's cheapest printing, USD. The bar is the share of upgraded lists that add it; the number after it, the share of the commander's decks that run it at all.</p>
+        </div>
+        <div class="recs-grid" id="buylist-grid"></div>
+      </section>
+
+      <div class="deck-actions">
+        <button class="ghost" id="copy-precon-after">Copy list after swaps</button>
+        <button class="ghost" id="copy-buylist">Copy buy list</button>
+        <button class="ghost" id="download-precon-after">Download .txt</button>
+      </div>
+    </article>
 
     <article class="deck" id="deck" hidden>
       <div class="plate">
