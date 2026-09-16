@@ -31,7 +31,7 @@ CARD_DB_GLOB = (
     "/home/vinci/.local/share/Steam/steamapps/common/MTGA"
     "/MTGA_Data/Downloads/Raw/Raw_CardDatabase_*.mtga"
 )
-OUTPUT_CSV = Path(__file__).resolve().parent / "collection_from_logs.csv"
+OUTPUT_CSV = Path(__file__).resolve().parents[1] / "collection_from_logs.csv"
 
 DECK_ZONES = ("MainDeck", "Sideboard", "CommandZone", "Companions")
 

@@ -22,7 +22,7 @@ Builds a Commander, Brawl, Standard or Pauper deck from your collection using Sc
 - Auto-distributes basic lands weighted by color demand of non-land cards
 - **Commander bracket (1-5)** estimated for every Commander and Brawl deck, with the evidence behind it — see below
 - EDHREC recommendation pass on finished Commander decks: splits what other players run into **upgrades** (cards you own that the builder skipped) and **acquisitions** (cards you don't own that most decks with this commander run), each labelled Staple / Flex / Tech by inclusion rate, with a synergy score and a price. Cached on disk for a week.
-- Web UI (`python web_app.py`): upload a collection, pick a format and a commander or colours, read the deck with its name, price, mana curve, pip demand, sideboard, EDHREC recommendations, and card art previews
+- Web UI (`magic-builder-web`): upload a collection, pick a format and a commander or colours, read the deck with its name, price, mana curve, pip demand, sideboard, EDHREC recommendations, and card art previews
 - MCP server exposing four tools Claude can call directly
 
 ## Setup
@@ -32,9 +32,9 @@ Builds a Commander, Brawl, Standard or Pauper deck from your collection using Sc
 git clone https://github.com/vinci128/magic-builder
 cd magic-builder
 
-# Create a virtual environment and install dependencies
+# Create a virtual environment and install the package (editable, with its CLI entry points)
 uv venv .venv
-uv pip install -r requirements.txt
+uv pip install -e .
 ```
 
 Export your collection from ManaBox as a CSV and place it in the project directory.
@@ -43,38 +43,38 @@ On its first run the builder downloads Scryfall's bulk card database (~80 MB gzi
 
 ## Automatic Arena collection scrape
 
-`scrape_collection.py` regenerates `collection_from_logs.csv` from MTG Arena's `Player.log` (Steam/Proton install, app ID 2141910). Arena no longer logs the full collection, so the scraper takes the union of all deck contents (max quantity per card across decks — starter/precon cards count as owned) from the login account payload, and resolves card ids to name/set/collector number via Arena's own card database (`Raw_CardDatabase_*.mtga`). Requires **Detailed Logs (Plugin Support)** enabled in Arena's Account options.
+`scripts/scrape_collection.py` regenerates `collection_from_logs.csv` from MTG Arena's `Player.log` (Steam/Proton install, app ID 2141910). Arena no longer logs the full collection, so the scraper takes the union of all deck contents (max quantity per card across decks — starter/precon cards count as owned) from the login account payload, and resolves card ids to name/set/collector number via Arena's own card database (`Raw_CardDatabase_*.mtga`). Requires **Detailed Logs (Plugin Support)** enabled in Arena's Account options.
 
-It runs automatically: the `mtga-collection.path` systemd user unit (`~/.config/systemd/user/`) watches `Player.log` and triggers `mtga-collection.service` after each Arena session. Run manually with `python3 scrape_collection.py`; it only rewrites the CSV when the collection changed.
+It runs automatically: the `mtga-collection.path` systemd user unit (`~/.config/systemd/user/`) watches `Player.log` and triggers `mtga-collection.service` after each Arena session. Run manually with `python3 scripts/scrape_collection.py`; it only rewrites the CSV when the collection changed.
 
 ## Usage
 
 ```bash
 # Build a deck (auto-selects best commander)
-python main.py ManaBox_Collection.csv
+magic-builder ManaBox_Collection.csv
 
 # Pick a specific commander from the ranked list (e.g. pick #5)
-python main.py ManaBox_Collection.csv --pick 5
+magic-builder ManaBox_Collection.csv --pick 5
 
 # Save to a custom output file
-python main.py ManaBox_Collection.csv --output my_deck.txt
+magic-builder ManaBox_Collection.csv --output my_deck.txt
 
 # Skip the EDHREC lookup (fully offline once the card database is cached)
-python main.py ManaBox_Collection.csv --no-recs
+magic-builder ManaBox_Collection.csv --no-recs
 
 # Build to a Commander bracket: keeps out what the bracket disallows, and
 # for bracket 3 puts in the Game Changers that are what reach it
-python main.py ManaBox_Collection.csv --target-bracket 3
+magic-builder ManaBox_Collection.csv --target-bracket 3
 
 # Build a 60-card Standard deck from an Arena collection (auto-picks colors)
-python main.py collection_from_logs.csv --format standard
+magic-builder collection_from_logs.csv --format standard
 
 # Force specific colors for the Standard deck
-python main.py collection_from_logs.csv --format standard --colors WB
+magic-builder collection_from_logs.csv --format standard --colors WB
 
 # Other formats: Brawl (100-card singleton, Arena pool) and Pauper (commons only)
-python main.py collection_from_logs.csv --format brawl
-python main.py collection_from_logs.csv --format pauper
+magic-builder collection_from_logs.csv --format brawl
+magic-builder collection_from_logs.csv --format pauper
 ```
 
 The EDHREC pass runs on Commander decks only and needs no credentials. Responses are cached under `.cache/edhrec/` for a week; use `--no-recs` to skip the lookup entirely.
@@ -87,13 +87,13 @@ Output is printed to the console and saved as:
 
 ```bash
 # Find the preconstructed Commander decks in a collection and suggest swaps
-python main.py ManaBox_Collection.csv --precons
+magic-builder ManaBox_Collection.csv --precons
 
 # ...also drawing on cards sleeved in your other precons
-python main.py ManaBox_Collection.csv --precons --include-deck-cards
+magic-builder ManaBox_Collection.csv --precons --include-deck-cards
 
 # ...scored for the commander(s) you actually play (partner precons especially)
-python main.py ManaBox_Collection.csv --precons \
+magic-builder ManaBox_Collection.csv --precons \
   --precon-commanders "Leonardo, the Balance // Michelangelo, the Heart"
 ```
 
@@ -150,8 +150,8 @@ The combo check is the only part that needs the network. The CLI skips it under 
 A browser front end for the same builders: drop in a collection file, pick one of the four formats and a commander or a colour pair, get the named deck back with its paper price, mana curve, pip demand, sideboard, card art on hover, and copy/download buttons. Commander and Brawl decks then load a **What other players run** section — EDHREC's upgrades and acquisitions, each tagged Staple / Flex / Tech and priced. When the collection contains a precon, a **Precons you own** panel appears in the rail; picking one shows its themes, bracket and CRISPI before and after, the swaps with their reasons, and a copy/download of the post-swap list.
 
 ```bash
-python web_app.py             # http://127.0.0.1:8000
-PORT=8010 python web_app.py   # pick another port
+magic-builder-web             # http://127.0.0.1:8000
+PORT=8010 magic-builder-web   # pick another port
 ```
 
 The Scryfall database loads once in the background at startup — the header shows when it's ready (first run downloads ~80 MB). One upload can feed several builds: switch format, change commander, rebuild without re-uploading.
@@ -178,9 +178,9 @@ service. In the Render dashboard: **New → Blueprint**, point it at this repo,
 and it reads the file.
 
 ```yaml
-buildCommand: pip install -r requirements.txt
-              python -c "from card_data import _download_bulk_data; _download_bulk_data()"
-startCommand: uvicorn web_app:app --host 0.0.0.0 --port $PORT
+buildCommand: pip install .
+              python -c "from magic_builder.data.scryfall import _download_bulk_data; _download_bulk_data()"
+startCommand: uvicorn magic_builder.web.app:app --host 0.0.0.0 --port $PORT
 ```
 
 The bulk card file is downloaded during the build rather than on first request,
@@ -189,7 +189,7 @@ so a cold start only pays for loading the cards, not the 80 MB download.
 Two things to know about the free tier:
 
 * **512 MB memory.** Loading all 116k cards costs about 116 MB (see the
-  `CardView` note in `card_data.py` — as plain dicts it was 644 MB and would
+  `CardView` note in `data/scryfall.py` — as plain dicts it was 644 MB and would
   not fit), leaving room for uvicorn and a handful of uploaded collections.
 * **Sleeps after 15 minutes idle.** The first request after a sleep waits
   ~1–2 minutes for the instance and the card database to come back up.
@@ -216,7 +216,8 @@ To enable it in Claude Code, add to your project's `.mcp.json`:
   "mcpServers": {
     "magic-builder": {
       "command": "/path/to/.venv/bin/python",
-      "args": ["/path/to/mcp_server.py"]
+      "args": ["-m", "magic_builder.mcp_server"],
+      "env": { "MAGIC_BUILDER_COLLECTION": "/path/to/ManaBox_Collection.csv" }
     }
   }
 }
@@ -226,27 +227,36 @@ To enable it in Claude Code, add to your project's `.mcp.json`:
 
 ```
 magic_builder/
-├── main.py              # CLI entry point (click)
-├── collection.py        # ManaBox CSV parser → OwnedCard objects
-├── arena_collection.py  # Arena export + Player.log CSV parsers, format detection
-├── scrape_collection.py # Player.log → collection_from_logs.csv (auto-run by systemd)
-├── card_data.py         # Scryfall bulk data download + enrichment (.cache/*.jsonl.gz)
-├── formats.py           # Format specs: legality key, deck size, copy cap, sideboard
-├── archetype.py         # Colour-combo names (Azorius, Jund...) and deck naming
-├── commander.py         # Commander candidate scoring and selection
-├── brackets.py          # Commander bracket (1-5) estimation and its criteria
-├── combos.py            # Two-card combo lookup via Commander Spellbook (.cache/combos/)
-├── scryfall_query.py    # Partial Scryfall-syntax reader, for combo template requirements
-├── deck_builder.py      # 99-card singleton deck construction and synergy scoring
-├── standard_builder.py  # 60-card constructed deck builder + sideboard
-├── edhrec_recs.py       # EDHREC upgrade / acquisition recommendations (.cache/edhrec/)
-├── precons.py           # Precon detection (EDHREC's precon index) and swap suggestions
-├── decks/               # Hand-reviewed precon swaps and post-swap import lists
-├── output.py            # Console and file formatting
-├── mcp_server.py        # FastMCP server exposing tools to Claude
-├── web_app.py           # FastAPI web UI + JSON API
-├── web/                 # Front end (index.html, styles.css, app.js)
-└── requirements.txt
+├── pyproject.toml                # package metadata, dependencies, console scripts
+├── src/magic_builder/
+│   ├── cli.py                    # `magic-builder` CLI entry point (click)
+│   ├── output.py                 # Console and file formatting
+│   ├── mcp_server.py             # `magic-builder-mcp`: FastMCP server exposing tools to Claude
+│   ├── paths.py                  # Cache location (.cache/ by default, MAGIC_BUILDER_CACHE to move it)
+│   ├── collection/
+│   │   ├── manabox.py            # ManaBox CSV parser → OwnedCard objects
+│   │   └── arena.py              # Arena export + Player.log CSV parsers, format detection
+│   ├── data/                     # External data sources
+│   │   ├── scryfall.py           # Scryfall bulk data download + enrichment (.cache/*.jsonl.gz)
+│   │   ├── scryfall_query.py     # Partial Scryfall-syntax reader, for combo template requirements
+│   │   └── edhrec.py             # EDHREC upgrade / acquisition recommendations (.cache/edhrec/)
+│   ├── builders/
+│   │   ├── formats.py            # Format specs: legality key, deck size, copy cap, sideboard
+│   │   ├── archetype.py          # Colour-combo names (Azorius, Jund...) and deck naming
+│   │   ├── candidates.py         # Commander candidate scoring and selection
+│   │   ├── commander.py          # 99-card singleton deck construction and synergy scoring
+│   │   └── standard.py           # 60-card constructed deck builder + sideboard
+│   ├── analysis/
+│   │   ├── brackets.py           # Commander bracket (1-5) estimation and its criteria
+│   │   ├── crispi.py             # CRISPI (Consistency, Resilience, Interaction, Speed) scoring
+│   │   ├── combos.py             # Two-card combo lookup via Commander Spellbook (.cache/combos/)
+│   │   └── precons.py            # Precon detection (EDHREC's precon index) and swap suggestions
+│   └── web/
+│       ├── app.py                # `magic-builder-web`: FastAPI web UI + JSON API
+│       └── static/               # Front end (index.html, styles.css, app.js)
+├── scripts/
+│   └── scrape_collection.py      # Player.log → collection_from_logs.csv (auto-run by systemd)
+└── decks/                        # Hand-reviewed precon swaps and saved deck lists
 ```
 
 ## Dependencies

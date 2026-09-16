@@ -1,6 +1,6 @@
 """FastAPI web UI for the deck builder.
 
-Run with:  python web_app.py   (or: uvicorn web_app:app --reload)
+Run with:  magic-builder-web   (or: uvicorn magic_builder.web.app:app --reload)
 
 The Scryfall bulk database is loaded once in a background thread at startup;
 uploads are parsed into an in-memory session so several decks can be built
@@ -16,41 +16,43 @@ import uuid
 from collections import Counter, OrderedDict
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-import brackets
-import combos
-import crispi
-import formats
-import precons
-from arena_collection import detect_collection_format, load_owned_cards
-from card_data import load_scryfall_lookup, load_by_name, enrich_collection, name_key
-from commander import find_commanders
-from deck_builder import (
+from magic_builder.analysis import brackets, combos, crispi, precons
+from magic_builder.builders import formats
+from magic_builder.builders.candidates import find_commanders
+from magic_builder.builders.commander import (
+    GENERIC_SYNERGY_THEMES,
+    SYNERGY_THEME_LABELS,
     build_deck,
     deck_archetype as commander_archetype,
     synergy_reasons,
-    SYNERGY_THEME_LABELS,
-    GENERIC_SYNERGY_THEMES,
 )
-from edhrec_recs import recommend
-from standard_builder import (
+from magic_builder.builders.standard import (
+    TAG_LABELS as STANDARD_TAG_LABELS,
     build_standard_deck,
     deck_archetype as constructed_archetype,
     synergy_tags as standard_synergy_tags,
-    TAG_LABELS as STANDARD_TAG_LABELS,
 )
-from output import (
+from magic_builder.collection.arena import detect_collection_format, load_owned_cards
+from magic_builder.data.edhrec import recommend
+from magic_builder.data.scryfall import (
+    enrich_collection,
+    load_by_name,
+    load_scryfall_lookup,
+    name_key,
+)
+from magic_builder.output import (
     format_deck,
     format_decklist,
     format_standard_deck,
     format_standard_decklist,
 )
 
-STATIC_DIR = Path(__file__).parent / "web"
+STATIC_DIR = Path(__file__).parent / "static"
 MAX_SESSIONS = 20
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 
@@ -716,7 +718,7 @@ def index():
 app.mount("/", StaticFiles(directory=STATIC_DIR), name="static")
 
 
-if __name__ == "__main__":
+def main():
     import uvicorn
 
     uvicorn.run(
@@ -724,3 +726,7 @@ if __name__ == "__main__":
         host=os.environ.get("HOST", "127.0.0.1"),
         port=int(os.environ.get("PORT", "8000")),
     )
+
+
+if __name__ == "__main__":
+    main()

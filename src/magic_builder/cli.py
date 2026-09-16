@@ -3,18 +3,26 @@ from pathlib import Path
 
 import click
 
-import brackets
-import crispi
-import formats
-import precons
-from arena_collection import load_owned_cards
-from combos import find_combos
-from card_data import load_scryfall_lookup, load_by_name, enrich_collection
-from commander import find_commanders
-from deck_builder import build_deck, deck_archetype as commander_archetype
-from edhrec_recs import recommend
-from standard_builder import build_standard_deck, deck_archetype as constructed_archetype
-from output import print_and_save, print_and_save_standard
+from magic_builder.analysis import brackets, crispi, precons
+from magic_builder.analysis.combos import find_combos
+from magic_builder.builders import formats
+from magic_builder.builders.candidates import find_commanders
+from magic_builder.builders.commander import (
+    build_deck,
+    deck_archetype as commander_archetype,
+)
+from magic_builder.builders.standard import (
+    build_standard_deck,
+    deck_archetype as constructed_archetype,
+)
+from magic_builder.collection.arena import load_owned_cards
+from magic_builder.data.edhrec import recommend
+from magic_builder.data.scryfall import (
+    enrich_collection,
+    load_by_name,
+    load_scryfall_lookup,
+)
+from magic_builder.output import print_and_save, print_and_save_standard
 
 
 @click.command()

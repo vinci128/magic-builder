@@ -1,5 +1,5 @@
-import formats
-from collection import OwnedCard
+from magic_builder.builders import formats
+from magic_builder.collection.manabox import OwnedCard
 
 
 def is_commander_eligible(card: OwnedCard, fmt: str = "commander") -> bool:

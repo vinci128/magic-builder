@@ -1,0 +1,35 @@
+[project]
+name = "magic-builder"
+version = "0.1.0"
+description = "Build Commander, Brawl, Standard and Pauper decks from the cards you own"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.12"
+dependencies = [
+    "click>=8.0",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "python-multipart>=0.0.9",
+    "mcp>=1.0",
+    "requests>=2.31",
+    "pyedhrec>=0.0.2",
+]
+
+[project.scripts]
+magic-builder = "magic_builder.cli:main"
+magic-builder-web = "magic_builder.web.app:main"
+magic-builder-mcp = "magic_builder.mcp_server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/magic_builder"]
+
+[tool.ruff]
+src = ["src"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["magic_builder"]
+combine-as-imports = true

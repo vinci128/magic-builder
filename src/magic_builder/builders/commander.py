@@ -1,9 +1,8 @@
 from typing import NamedTuple
 
-import archetype
-import brackets
-import formats
-from collection import OwnedCard
+from magic_builder.analysis import brackets
+from magic_builder.builders import archetype, formats
+from magic_builder.collection.manabox import OwnedCard
 
 # Target slot counts for non-land cards
 NONBASIC_LAND_TARGET = 24   # owned non-basic lands from collection
@@ -357,7 +356,7 @@ def _bracket_pool(pool: list, commander: OwnedCard, target: int) -> tuple[list, 
 
     Only the card-level criteria are decided here. Two-card combos depend on
     which pairs end up together and are only known once Commander Spellbook has
-    answered, so `main.py` reports them against the target rather than building
+    answered, so `cli.py` reports them against the target rather than building
     around them.
     """
     def best(cards: list, limit: int) -> list:

@@ -3,11 +3,12 @@ import json
 import re
 import threading
 import time
-from pathlib import Path
 
 import requests
 
-CACHE_DIR = Path(".cache")
+from magic_builder.paths import CACHE_ROOT
+
+CACHE_DIR = CACHE_ROOT
 CACHE_FILE = CACHE_DIR / "scryfall_default_cards.jsonl.gz"
 CACHE_TTL = 7 * 86400  # 7 days — bulk data barely changes between set releases
 

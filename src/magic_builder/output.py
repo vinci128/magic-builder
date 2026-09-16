@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from collection import OwnedCard
+from magic_builder.collection.manabox import OwnedCard
 
 
 def _categorize(cards: list) -> dict:

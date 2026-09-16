@@ -57,7 +57,7 @@ Where the numbers come from
 ---------------------------
 Game Changers are a published list, read off Scryfall's `game_changer` field,
 so that criterion is exact. Mass land denial, extra turns and tutors are
-inferred from rules text, in the style of `deck_builder.py`'s role detectors:
+inferred from rules text, in the style of `builders/commander.py`'s role detectors:
 good enough to sort decks, not a rules oracle. Two-card combos come from
 Commander Spellbook via `combos.py`, and are reported as unchecked rather than
 as absent when that lookup could not run.
@@ -76,7 +76,7 @@ not put a deck in another bracket.
 import re
 from typing import NamedTuple
 
-from combos import EARLY_TURN
+from magic_builder.analysis.combos import EARLY_TURN
 
 BRACKET_NAMES = {
     1: "Exhibition",

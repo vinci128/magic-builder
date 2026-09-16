@@ -1,28 +1,25 @@
 """MCP server exposing the Magic Commander deck builder as tools."""
 
 import json
-import sys
-from pathlib import Path
-
-# Ensure the project directory is on the path
-sys.path.insert(0, str(Path(__file__).parent))
+import os
 
 from mcp.server.fastmcp import FastMCP
 
-import brackets
-import crispi
-from arena_collection import load_owned_cards
-from card_data import load_scryfall_lookup, enrich_collection
-from commander import find_commanders
-from deck_builder import build_deck, synergy_score
-from standard_builder import (
+from magic_builder.analysis import brackets, crispi
+from magic_builder.builders.candidates import find_commanders
+from magic_builder.builders.commander import build_deck, synergy_score
+from magic_builder.builders.standard import (
     build_standard_deck as _build_standard,
     deck_archetype as _constructed_archetype,
 )
+from magic_builder.collection.arena import load_owned_cards
+from magic_builder.data.scryfall import enrich_collection, load_scryfall_lookup
 
 mcp = FastMCP("magic-builder")
 
-CSV_PATH = str(Path(__file__).parent / "ManaBox_Collection.csv")
+# Default collection when a tool call names none: MAGIC_BUILDER_COLLECTION, else a
+# ManaBox export in the directory the server was launched from.
+CSV_PATH = os.environ.get("MAGIC_BUILDER_COLLECTION", "ManaBox_Collection.csv")
 
 # Cache enriched collection so repeated tool calls don't re-download
 _cache: dict = {}
@@ -104,8 +101,13 @@ def build_commander_deck(commander_name: str, csv_path: str = CSV_PATH) -> str:
             "basic_filler": c.is_basic_filler,
         }
 
-    # Annotate roles (mirror deck_builder logic labels)
-    from deck_builder import _is_land, _is_ramp, _is_card_draw, _is_removal
+    # Annotate roles (mirror builders.commander logic labels)
+    from magic_builder.builders.commander import (
+        _is_card_draw,
+        _is_land,
+        _is_ramp,
+        _is_removal,
+    )
 
     annotated = []
     for c in deck:
@@ -223,5 +225,9 @@ def get_collection_stats(csv_path: str = CSV_PATH) -> str:
     }, indent=2)
 
 
-if __name__ == "__main__":
+def main():
     mcp.run()
+
+
+if __name__ == "__main__":
+    main()

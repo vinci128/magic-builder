@@ -19,10 +19,13 @@ a low curve, and a critical mass of interaction. The builder:
 import re
 from dataclasses import dataclass, field
 
-import archetype
-import formats
-from collection import OwnedCard
-from deck_builder import BASIC_LAND_NAMES, _is_basic_land, _make_basic
+from magic_builder.builders import archetype, formats
+from magic_builder.builders.commander import (
+    BASIC_LAND_NAMES,
+    _is_basic_land,
+    _make_basic,
+)
+from magic_builder.collection.manabox import OwnedCard
 
 DECK_SIZE = 60
 MAX_COPIES = 4

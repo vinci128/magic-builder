@@ -2,7 +2,10 @@
   "mcpServers": {
     "magic-builder": {
       "command": "/home/vinci/magic_builder/.venv/bin/python",
-      "args": ["/home/vinci/magic_builder/mcp_server.py"]
+      "args": ["-m", "magic_builder.mcp_server"],
+      "env": {
+        "MAGIC_BUILDER_COLLECTION": "/home/vinci/magic_builder/ManaBox_Collection.csv"
+      }
     }
   }
 }

@@ -16,7 +16,7 @@ from the collection alone:
     "cards to cut" list, with a cost-based fallback when that is unavailable.
 
 Everything from EDHREC is cached on disk for a week, next to the commander
-pages `edhrec_recs` already caches. Detection still works offline once the
+pages `data.edhrec` already caches. Detection still works offline once the
 lists have been fetched once; a cold start needs the network.
 """
 
@@ -29,11 +29,8 @@ from types import SimpleNamespace
 
 import requests
 
-import brackets
-import crispi
-from card_data import enrich_collection, name_key
-from collection import OwnedCard
-from deck_builder import (
+from magic_builder.analysis import brackets, crispi
+from magic_builder.builders.commander import (
     DRAW_TARGET,
     GENERIC_SYNERGY_THEMES,
     RAMP_TARGET,
@@ -45,7 +42,14 @@ from deck_builder import (
     _is_removal,
     synergy_reasons,
 )
-from edhrec_recs import CACHE_DIR, CACHE_TTL, _merge_sections, fetch_commander_cards
+from magic_builder.collection.manabox import OwnedCard
+from magic_builder.data.edhrec import (
+    CACHE_DIR,
+    CACHE_TTL,
+    _merge_sections,
+    fetch_commander_cards,
+)
+from magic_builder.data.scryfall import enrich_collection, name_key
 
 INDEX_URL = "https://json.edhrec.com/pages/precon.json"
 PAGE_URL = "https://json.edhrec.com/pages/precon/{slug}.json"
@@ -323,7 +327,7 @@ def _subtypes(card: OwnedCard) -> set:
 
 
 def _role_view(card: OwnedCard):
-    """`card` as deck_builder's role tests see it, with reminder text removed —
+    """`card` as builders.commander's role tests see it, with reminder text removed —
     a Lander token's reminder text otherwise reads as land ramp."""
     return SimpleNamespace(oracle_text=_rules(card), type_line=card.type_line)
 

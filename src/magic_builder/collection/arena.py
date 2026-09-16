@@ -1,6 +1,7 @@
 import csv
 import re
-from collection import OwnedCard, parse_collection
+
+from magic_builder.collection.manabox import OwnedCard, parse_collection
 
 _LINE_RE = re.compile(r'^(\d+)\s+(.+?)\s+\(([A-Za-z0-9]+)\)\s+(\S+)$')
 

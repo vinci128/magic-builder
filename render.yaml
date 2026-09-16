@@ -9,9 +9,9 @@ services:
     # instance: a cold start after the free tier's idle sleep then skips the
     # ~80 MB download and only pays for loading the cards into memory.
     buildCommand: |
-      pip install -r requirements.txt
-      python -c "from card_data import _download_bulk_data; _download_bulk_data()"
-    startCommand: uvicorn web_app:app --host 0.0.0.0 --port $PORT
+      pip install .
+      python -c "from magic_builder.data.scryfall import _download_bulk_data; _download_bulk_data()"
+    startCommand: uvicorn magic_builder.web.app:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.9"

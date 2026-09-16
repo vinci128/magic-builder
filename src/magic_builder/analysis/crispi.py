@@ -53,7 +53,7 @@ import itertools
 import math
 import re
 
-import brackets
+from magic_builder.analysis import brackets
 
 # ── Scoring helpers ──────────────────────────────────────────────────────────
 

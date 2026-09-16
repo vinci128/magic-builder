@@ -18,10 +18,11 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from card_data import name_key as _name_key
-from collection import OwnedCard
+from magic_builder.collection.manabox import OwnedCard
+from magic_builder.data.scryfall import name_key as _name_key
+from magic_builder.paths import CACHE_ROOT
 
-CACHE_DIR = Path(".cache/edhrec")
+CACHE_DIR = CACHE_ROOT / "edhrec"
 CACHE_TTL = 7 * 86400
 
 # "New Cards" is a recency feed rather than a recommendation, so it is skipped.
@@ -135,7 +136,7 @@ def recommend(
 ) -> dict:
     """Split EDHREC's recommendations for `commander` into upgrades and acquisitions.
 
-    `card_index` is card_data.load_by_name(); pass it to price the cards you
+    `card_index` is data.scryfall.load_by_name(); pass it to price the cards you
     don't own, which is the whole point of the acquisition list.
 
     Returns {"upgrades": [...], "acquire": [...], "in_deck": int, "total": int},

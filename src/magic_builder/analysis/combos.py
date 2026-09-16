@@ -29,10 +29,11 @@ from pathlib import Path
 
 import requests
 
-from scryfall_query import compile_query
+from magic_builder.data.scryfall_query import compile_query
+from magic_builder.paths import CACHE_ROOT
 
 API_URL = "https://backend.commanderspellbook.com/estimate-bracket"
-CACHE_DIR = Path(".cache/combos")
+CACHE_DIR = CACHE_ROOT / "combos"
 CACHE_TTL = 7 * 86400  # the combo database grows by set release, not by day
 TIMEOUT = 20
 
