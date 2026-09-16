@@ -322,7 +322,9 @@ def card_from_name(name: str, card_index: dict) -> OwnedCard | None:
 
 
 def _subtypes(card: OwnedCard) -> set:
-    parts = card.type_line.split("—")
+    # Front face only: a double-faced type line ("... — Human // Legendary
+    # Enchantment Creature — Saga") would otherwise read "Creature" as a subtype.
+    parts = card.type_line.split("//")[0].split("—")
     return set(parts[1].split()) if len(parts) > 1 else set()
 
 
