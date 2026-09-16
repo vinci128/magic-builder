@@ -1,0 +1,31 @@
+Deck
+4 Fanatical Firebrand
+4 Ghitu Lavarunner
+2 Heartfire Immolator
+2 Viashino Pyromancer
+1 Fugitive Codebreaker
+1 Razorkin Needlehead
+1 Searslicer Goblin
+2 Expressive Firedancer
+2 Bothersome Noisemaker
+1 Flamewake Phoenix
+2 Giant Cindermaw
+4 Burst Lightning
+4 Shock
+4 Lightning Strike
+4 Abrade
+2 Scorching Dragonfire
+20 Mountain
+
+Sideboard
+1 Scorching Dragonfire
+1 Plasma Bolt
+2 Fiery Annihilation
+2 Unsubtle Mockery
+1 Skycrash
+1 Take Out the Trash
+1 Tectonic Hazard
+1 Electro's Bolt
+2 Thrill of Possibility
+2 Goblin Boarders
+1 Terror of the Peaks
