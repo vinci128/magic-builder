@@ -6,7 +6,7 @@ Builds a Commander, Brawl, Standard or Pauper deck from your collection using Sc
 
 ## Features
 
-- Parses three collection formats, auto-detected: ManaBox CSV, Arena deck export (`N Card Name (SET) ###`), and Arena collection CSV scraped from Player.log (`grp_id,name,set,...`)
+- Parses three collection formats, auto-detected: ManaBox CSV, Arena deck export (`N Card Name (SET) ###`), and an Arena collection CSV (`grp_id,name,set,collector_number,quantity,...`) as produced from an [mtga-export](https://github.com/PBernaerts/mtga-export) dump — see below
 - Enriches every card with Scryfall data (type, oracle text, keywords, CMC, P/T, mana cost, rarity, legalities, USD price)
 - **Four formats** (`--format`), defined in `formats.py`: `commander` and `brawl` (1 commander + 99, singleton) and `standard` and `pauper` (60 cards, 4-of, plus a sideboard). Each is just a Scryfall legality key, a deck size, a copy cap and a sideboard size, so the two builders stay generic.
 - **Constructed mode** (`--format standard` / `pauper`): merges printings with a 4-copy cap, auto-picks the strongest mono- or two-color identity (rate + synergy-pair scoring: lifegain sources ↔ payoffs, tokens ↔ anthems), fills the curve with a guaranteed interaction floor, builds a mana base from owned duals + weighted basics, then fills a 15-card sideboard from the leftovers, favouring answers the maindeck can't afford (artifact/enchantment removal, graveyard hate, counterspells)
@@ -37,15 +37,23 @@ uv venv .venv
 uv pip install -e .
 ```
 
-Export your collection from ManaBox as a CSV and place it in the project directory.
+Export your collection from ManaBox as a CSV and place it in the project directory. Collection files are personal data and are gitignored (`ManaBox_Collection*.csv`, `collection*.csv`, `arena-export/`).
 
 On its first run the builder downloads Scryfall's bulk card database (~80 MB gzipped) into `.cache/` and refreshes it weekly. Everything after that is local except the EDHREC lookup.
 
-## Automatic Arena collection scrape
+## Arena collection
 
-`scripts/scrape_collection.py` regenerates `collection_from_logs.csv` from MTG Arena's `Player.log` (Steam/Proton install, app ID 2141910). Arena no longer logs the full collection, so the scraper takes the union of all deck contents (max quantity per card across decks — starter/precon cards count as owned) from the login account payload, and resolves card ids to name/set/collector number via Arena's own card database (`Raw_CardDatabase_*.mtga`). Requires **Detailed Logs (Plugin Support)** enabled in Arena's Account options.
+Arena never writes the collection to disk, so it has to be read out of the running client. [mtga-export](https://github.com/PBernaerts/mtga-export) does that on Linux (Steam/Proton) through a pinned `mtga-tracker-daemon`; with Arena open at its home screen:
 
-It runs automatically: the `mtga-collection.path` systemd user unit (`~/.config/systemd/user/`) watches `Player.log` and triggers `mtga-collection.service` after each Arena session. Run manually with `python3 scripts/scrape_collection.py`; it only rewrites the CSV when the collection changed.
+```bash
+mtga-export -o arena-export                     # collection.json + collection-moxfield.csv
+python3 scripts/arena_export_to_csv.py arena-export/collection.json collection_from_logs.csv
+magic-builder collection_from_logs.csv --format brawl
+```
+
+The result was checked entry-for-entry against Untapped's upload of the same account and matched. The JSON lists every printing you own, including Alchemy and other digital-only cards; the builders drop whatever Scryfall does not know, and format legality takes care of the rest.
+
+`scripts/scrape_collection.py` is the previous approach and is kept only for reference. It read the login payload from `Player.log` and took the union of all deck lists as "owned" — which counts every card in an imported deck, whether you own it or not. Decks built from its output included cards that were never in the collection; do not build from it.
 
 ## Usage
 
@@ -255,9 +263,25 @@ magic_builder/
 │       ├── app.py                # `magic-builder-web`: FastAPI web UI + JSON API
 │       └── static/               # Front end (index.html, styles.css, app.js)
 ├── scripts/
-│   └── scrape_collection.py      # Player.log → collection_from_logs.csv (auto-run by systemd)
-└── decks/                        # Hand-reviewed precon swaps and saved deck lists
+│   ├── arena_export_to_csv.py    # mtga-export collection.json → collection_from_logs.csv
+│   └── scrape_collection.py      # Legacy Player.log deck-union scrape; kept for reference only
+└── decks/                        # Saved deck lists and the precon swap review (see below)
 ```
+
+## Saved decks
+
+`decks/` holds Arena-importable lists (`*.decklist.txt`: `Commander` / `Deck` / `Sideboard` sections, front-face names only — Arena's importer rejects `Front // Back`) and the precon review.
+
+| File | What |
+| --- | --- |
+| `standard_mono_red.decklist.txt` | Standard, mono-red aggro/burn — 22 hasty and prowess creatures, 18 burn spells, 20 Mountains. Hand-built from the verified Arena export (September 2026); the only archetype in that pool with real 4-of density |
+| `kroxa_brawl.decklist.txt` | Historic Brawl, Kroxa, Titan of Death's Hunger — Rakdos removal and discard midrange. Cast Kroxa once for two, let it go to the graveyard, escape it later with no commander tax |
+| `adeline_brawl.decklist.txt` | Historic Brawl, Adeline, Resplendent Cathar — mono-white go-wide with Luminous Broodmoth as sweeper insurance |
+| `standard_mono_white.decklist.txt`, `standard_deck.*` | Earlier Standard builds from a smaller collection |
+| `korvold_brawl.decklist.txt` | Built from the Player.log scrape and not actually buildable — Korvold and several staples in it were never owned. Kept as a record |
+| `*-current.txt`, `*-upgraded.txt`, `PRECON_SWAPS.md`, `PRECON_BUYLIST.md` | The three paper precons as owned, after the suggested swaps, the hand-reviewed swap rationale, and the buy list by budget |
+
+The builders are heuristic and the singleton one ranks Brawl commanders by how many owned cards fit their colours, so it always proposes five-colour legends over a stronger two-colour one; the Brawl lists above were picked and filled by hand from the legal pool, then checked against owned quantities, legality and colour identity.
 
 ## Dependencies
 

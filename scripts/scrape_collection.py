@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Scrape owned cards from MTG Arena's Player.log into collection_from_logs.csv.
 
+SUPERSEDED. The deck-union heuristic below counts every card in an imported
+deck as owned, so its output included cards never in the collection. Use
+mtga-export plus scripts/arena_export_to_csv.py instead (see README); this
+file is kept for reference only.
+
 Arena no longer writes the full collection to Player.log, but with
 "Detailed Logs (Plugin Support)" enabled it logs an account payload
 (InventoryInfo + Decks) on login. Every card in one of your decks —
