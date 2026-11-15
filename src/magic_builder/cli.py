@@ -3,7 +3,7 @@ from pathlib import Path
 
 import click
 
-from magic_builder.analysis import brackets, crispi, precons
+from magic_builder.analysis import brackets, crispi, meta, precons
 from magic_builder.analysis.combos import find_combos
 from magic_builder.builders import formats
 from magic_builder.builders.candidates import find_commanders
@@ -16,6 +16,7 @@ from magic_builder.builders.standard import (
     deck_archetype as constructed_archetype,
 )
 from magic_builder.collection.arena import load_owned_cards
+from magic_builder.data import mtggoldfish
 from magic_builder.data.edhrec import recommend
 from magic_builder.data.scryfall import (
     enrich_collection,
@@ -77,17 +78,25 @@ from magic_builder.output import print_and_save, print_and_save_standard
          "Michelangelo, the Heart\". Applies to every detected precon whose list "
          "contains those cards; the rest use EDHREC's default.",
 )
+@click.option(
+    "--meta", "meta_fmt", default=None,
+    type=click.Choice(list(mtggoldfish.FORMATS)),
+    help="Instead of building a deck, rank the format's current MTGGoldfish "
+         "archetypes by how much of each list you own, with what is missing and "
+         "what it costs. Saves the closest list to --output.",
+)
 def main(collection_path: str, output: str, no_recs: bool, fmt: str, colors: str | None,
          pick: int, target_bracket: int | None, precons_mode: bool,
-         include_deck_cards: bool, precon_commanders: str | None):
-    """Build a Commander, Brawl, Standard or Pauper deck from your collection.
+         include_deck_cards: bool, precon_commanders: str | None, meta_fmt: str | None):
+    """Build a Commander, Brawl, Standard, Pauper or Modern deck from your collection.
 
     Accepts a ManaBox CSV export, an MTG Arena deck export
     (lines of the form: N Card Name (SET) collector#), or an Arena
     collection CSV scraped from Player.log.
 
     With --precons it does something else with the same file: recognises the
-    precons you own and says what to swap into each.
+    precons you own and says what to swap into each. With --meta FORMAT it
+    ranks the current meta decks by how close the collection is to each.
     """
     spec = formats.get(fmt)
     if target_bracket is not None and not spec.singleton:
@@ -103,6 +112,10 @@ def main(collection_path: str, output: str, no_recs: bool, fmt: str, colors: str
 
     # ── 2. Enrich with Scryfall metadata ──────────────────────────────────
     enrich_collection(owned, lookup)
+
+    if meta_fmt:
+        _meta_report(owned, meta_fmt, output)
+        return
 
     if precons_mode:
         names = [n.strip() for n in (precon_commanders or "").split("//") if n.strip()]
@@ -182,6 +195,25 @@ def main(collection_path: str, output: str, no_recs: bool, fmt: str, colors: str
     print_and_save(commander, deck, output, recs,
                    format_label=spec.label, name=commander_archetype(deck, commander),
                    bracket=bracket)
+
+
+def _meta_report(owned: list, fmt: str, output: str):
+    """The --meta path: rank the meta, print it, save the closest list."""
+    print(f"\nReading the {formats.get(fmt).label} metagame from MTGGoldfish...")
+    try:
+        found = meta.match(owned, fmt)
+    except mtggoldfish.FETCH_ERRORS as exc:
+        click.echo(f"Could not read MTGGoldfish's {fmt} metagame: {exc}", err=True)
+        sys.exit(1)
+    if not found:
+        click.echo("No archetype lists could be read.", err=True)
+        sys.exit(1)
+    print()
+    print(meta.format_report(found, fmt))
+    best = found[0]
+    path = Path(output).with_suffix(".decklist.txt")
+    path.write_text(meta.decklist_text(best), encoding="utf-8")
+    print(f"Closest list ({best.archetype.name}) saved to {path}")
 
 
 def _precon_report(owned: list, output: str, include_deck_cards: bool,
