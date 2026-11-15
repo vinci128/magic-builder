@@ -26,6 +26,7 @@ FORMATS: dict[str, FormatSpec] = {
     # Scryfall's `pauper` legality is already common-only, so no rarity filter
     # of our own is needed.
     "pauper": FormatSpec("pauper", "Pauper", False, 60, 4, 15),
+    "modern": FormatSpec("modern", "Modern", False, 60, 4, 15),
 }
 
 SINGLETON_FORMATS = [k for k, f in FORMATS.items() if f.singleton]
