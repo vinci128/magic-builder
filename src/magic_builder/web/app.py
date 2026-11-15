@@ -16,12 +16,12 @@ import uuid
 from collections import Counter, OrderedDict
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from magic_builder.analysis import brackets, combos, crispi, precons
+from magic_builder.analysis import brackets, combos, crispi, meta, precons
 from magic_builder.builders import formats
 from magic_builder.builders.candidates import find_commanders
 from magic_builder.builders.commander import (
@@ -38,6 +38,7 @@ from magic_builder.builders.standard import (
     synergy_tags as standard_synergy_tags,
 )
 from magic_builder.collection.arena import detect_collection_format, load_owned_cards
+from magic_builder.data import mtggoldfish
 from magic_builder.data.edhrec import recommend
 from magic_builder.data.scryfall import (
     enrich_collection,
@@ -377,7 +378,8 @@ async def upload_collection(file: UploadFile = File(...)):
         )
 
     enrich_collection(owned, lookup)
-    sid = _store({"owned": owned, "commanders": None, "filename": file.filename})
+    sid = _store({"owned": owned, "commanders": None, "filename": file.filename,
+                  "source": fmt})
 
     colors = Counter()
     types = Counter()
@@ -394,6 +396,7 @@ async def upload_collection(file: UploadFile = File(...)):
     return {
         "id": sid,
         "filename": file.filename,
+        "source": fmt,
         "source_format": {"manabox": "ManaBox CSV", "arena": "Arena list",
                           "arena_log": "Arena collection CSV"}.get(fmt, fmt),
         "unique": len(owned),
@@ -608,6 +611,58 @@ def recommendations(sid: str, commander: str, limit: int = 20, refresh: bool = F
         "upgrades": [_rec_json(r) for r in result["upgrades"]],
         "acquire": acquire,
         "acquire_price": round(sum(r["price"] for r in acquire), 2),
+    }
+
+
+# ── Meta decks ───────────────────────────────────────────────────────────────
+
+def _gap_json(gap) -> dict:
+    return {"name": gap.name, "need": gap.need, "have": gap.have, "short": gap.short,
+            "rarity": gap.rarity, "price": round(gap.price, 2), "image_url": gap.image_url}
+
+
+@app.get("/api/collection/{sid}/meta/{fmt}")
+def meta_decks(sid: str, fmt: str, limit: int = Query(30, ge=1, le=60), refresh: bool = False):
+    """The format's most-played MTGGoldfish archetypes, closest to the collection first."""
+    session = _session(sid)
+    if fmt not in mtggoldfish.FORMATS:
+        raise HTTPException(400, f"No meta data for {fmt!r}. Known: {', '.join(mtggoldfish.FORMATS)}")
+    key = f"meta:{fmt}:{limit}"
+    found = session.get(key)
+    if found is None or refresh:
+        try:
+            found = meta.match(session["owned"], fmt, limit=limit, refresh=refresh)
+        except mtggoldfish.FETCH_ERRORS as exc:  # unreachable on a cold cache, or redesigned
+            raise HTTPException(503, f"Could not read MTGGoldfish's {fmt} metagame: {exc}")
+        session[key] = found
+    source = session.get("source", "manabox")
+    return {
+        "format": fmt,
+        "label": formats.get(fmt).label,
+        "arena": source in ("arena", "arena_log"),
+        "archetypes": [
+            {
+                "slug": m.archetype.slug,
+                "name": m.archetype.name,
+                "url": m.archetype.url,
+                "share": m.archetype.share,
+                "decks": m.archetype.decks,
+                "paper_price": m.archetype.paper_price,
+                "colors": m.archetype.colors,
+                "key_cards": m.archetype.key_cards,
+                "commanders": m.deck.commanders,
+                "coverage": round(m.coverage, 3),
+                "owned_copies": m.owned_copies,
+                "needed_copies": m.needed_copies,
+                "missing": [_gap_json(g) for g in m.missing],
+                "sideboard_missing": [_gap_json(g) for g in m.sideboard_missing],
+                "wildcards": m.wildcards,
+                "cost_usd": m.cost_usd,
+                "sideboard_cost_usd": m.sideboard_cost_usd,
+                "decklist": meta.decklist_text(m),
+            }
+            for m in found
+        ],
     }
 
 

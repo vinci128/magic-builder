@@ -260,8 +260,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* ── Tabs and options ─────────────────────────────────────────────────── */
 
 .tabs {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   gap: 2px;
   background: var(--rule-soft);
   border-radius: var(--radius);
@@ -270,6 +270,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 
 .tab {
+  flex: 1 1 auto;
   background: none;
   border: 0;
   border-radius: 2px;
@@ -1131,3 +1132,42 @@ button { font: inherit; color: inherit; cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* ── Meta decks ───────────────────────────────────────────────────────── */
+
+.meta-formats { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.meta-fmt {
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 5px 9px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.meta-fmt:hover { color: var(--ink); }
+.meta-fmt[aria-pressed="true"] { color: var(--ink); border-color: var(--brass); }
+
+.meta-btn .cmd-score { min-width: 3.2em; text-align: right; }
+.meta-btn .cmd-score.is-share { color: var(--ink-3); }
+.meta-btn .cmd-score.is-cover { color: var(--brass); }
+
+.coverage { display: grid; gap: 8px; }
+.coverage-pct { font-family: var(--display); font-size: 34px; line-height: 1; color: var(--ink); }
+.coverage-bar {
+  display: block;
+  height: 6px;
+  background: var(--rule);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.coverage-bar i { display: block; height: 100%; background: var(--brass); border-radius: 3px; }
+.coverage-line { font-family: var(--data); font-size: 12px; color: var(--ink-2); }
+
+.meta-missing { margin-top: 28px; }
+.meta-missing .rec { grid-template-columns: 28px minmax(0, 1fr) auto auto; }
+.rec-rarity[data-rarity="common"] { color: var(--ink-3); }
+.rec-rarity[data-rarity="uncommon"] { color: var(--ink-2); }
+.rec-rarity[data-rarity="rare"] { color: var(--brass); }
+.rec-rarity[data-rarity="mythic"] { color: var(--R); }
+
+a.ghost { text-decoration: none; display: inline-flex; align-items: center; }

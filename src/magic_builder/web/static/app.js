@@ -3,7 +3,7 @@ const $ = (id) => document.getElementById(id);
 const COLOR_NAMES = { W: "White", U: "Blue", B: "Black", R: "Red", G: "Green", C: "Colorless" };
 
 // Formats built around a commander, as opposed to constructed 4-of decks.
-// Mirrors formats.py — the tabs in index.html are the same four keys.
+// Mirrors formats.py — the tabs in index.html use the same keys.
 const SINGLETON = new Set(["commander", "brawl"]);
 
 const money = (n) =>
@@ -19,6 +19,10 @@ const state = {
   precon: null,         // swap report for the precon currently on the stage
   preconList: [],       // detected precons, with EDHREC's pairings for each
   pairing: "",          // "A // B" chosen for the precon on the stage, "" = EDHREC default
+  source: "",           // collection source: "manabox", "arena" or "arena_log"
+  metaFormat: null,     // format shown in the meta-decks panel
+  metaData: {},         // format -> /meta response, so switching back is instant
+  metaDeck: null,       // archetype currently on the stage
 };
 
 // What asking for each bracket actually does to the build. Mirrors the
@@ -100,8 +104,12 @@ async function upload(file) {
     renderStats(data);
     $("build-panel").hidden = false;
     $("build-panel").classList.add("enter");
+    state.source = data.source;
+    state.metaData = {};
     loadCommanders();
     loadPrecons();
+    // Arena players play Standard; a paper collection is most often precons.
+    loadMeta(data.source === "manabox" ? "commander" : "standard");
   } catch (err) {
     showError("upload-error", err.message);
   } finally {
@@ -291,6 +299,7 @@ function setWorking(on, text = "") {
     $("empty").hidden = true;
     $("deck").hidden = true;
     $("precon").hidden = true;
+    $("metadeck").hidden = true;
   }
 }
 
@@ -372,6 +381,7 @@ async function loadPreconSwaps(slug) {
 function renderPrecon(data) {
   $("empty").hidden = true;
   $("deck").hidden = true;
+  $("metadeck").hidden = true;
   const article = $("precon");
   article.hidden = false;
   article.classList.remove("enter");
@@ -565,11 +575,194 @@ $("download-precon-after").addEventListener("click", () => {
   URL.revokeObjectURL(link.href);
 });
 
+// ── Meta decks ──────────────────────────────────────────────────────────────
+
+const pct = (x) => `${Math.round(x * 100)}%`;
+const isArena = () => state.source === "arena" || state.source === "arena_log";
+const WILDCARD_ORDER = ["mythic", "rare", "uncommon", "common"];
+
+$("meta-formats").addEventListener("click", (e) => {
+  const btn = e.target.closest(".meta-fmt");
+  if (btn) loadMeta(btn.dataset.meta);
+});
+
+async function loadMeta(fmt) {
+  if (!state.collectionId) return;
+  const panel = $("meta-panel");
+  const list = $("meta-list");
+  panel.hidden = false;
+  state.metaFormat = fmt;
+  $("meta-formats").querySelectorAll(".meta-fmt").forEach((b) =>
+    b.setAttribute("aria-pressed", String(b.dataset.meta === fmt)));
+
+  let data = state.metaData[fmt];
+  if (!data) {
+    list.replaceChildren();
+    $("meta-note").textContent = "Reading the current meta from MTGGoldfish…";
+    try {
+      const res = await fetch(`/api/collection/${state.collectionId}/meta/${fmt}`);
+      data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Could not read the meta.");
+      state.metaData[fmt] = data;
+    } catch (err) {
+      if (state.metaFormat === fmt) $("meta-note").textContent = err.message;
+      return;
+    }
+  }
+  // A slow format the user has since left must not overwrite the one on screen.
+  if (state.metaFormat !== fmt) return;
+  renderMetaList(data);
+}
+
+function renderMetaList(data) {
+  const list = $("meta-list");
+  list.replaceChildren();
+  if (!data.archetypes.length) {
+    $("meta-note").textContent = `No ${data.label} archetypes could be read right now.`;
+    return;
+  }
+  $("meta-note").textContent =
+    `The ${data.archetypes.length} most-played ${data.label} decks, closest to your collection first. ` +
+    "Left: how much of the list you own. Right: share of the meta.";
+  data.archetypes.forEach((arch) => {
+    const btn = document.createElement("button");
+    btn.className = "cmd precon-btn meta-btn";
+    btn.innerHTML = `<span class="cmd-name"></span>
+      <span class="cmd-meta">${pips(arch.colors)}<span class="cmd-score is-cover">${pct(arch.coverage)}</span><span class="cmd-score is-share">${arch.share.toFixed(1)}%</span></span>
+      <span class="precon-sub"></span>`;
+    btn.querySelector(".cmd-name").textContent = arch.name;
+    btn.querySelector(".precon-sub").textContent = metaCostLine(arch);
+    btn.title = `${pct(arch.coverage)} of the main deck owned · ${arch.share.toFixed(1)}% of the ${data.label} meta (${arch.decks} decks)`
+      + (arch.key_cards.length ? `\nKey cards: ${arch.key_cards.join(", ")}` : "");
+    btn.addEventListener("click", () => {
+      list.querySelectorAll(".cmd").forEach((c) => c.classList.toggle("is-on", c === btn));
+      renderMetaDeck(arch, data);
+    });
+    list.append(btn);
+  });
+}
+
+function wildcardText(wildcards) {
+  return WILDCARD_ORDER.filter((r) => wildcards[r]).map((r) => `${wildcards[r]} ${r}`).join(" · ");
+}
+
+function metaCostLine(arch) {
+  const short = arch.needed_copies - arch.owned_copies;
+  if (!short) return "Complete — you own every card";
+  const cost = isArena() ? (wildcardText(arch.wildcards) || "no wildcards") : money(arch.cost_usd);
+  return `${short} card${short === 1 ? "" : "s"} short · ${cost}`;
+}
+
+function renderMetaDeck(arch, data) {
+  state.metaDeck = arch;
+  $("empty").hidden = true;
+  $("deck").hidden = true;
+  $("precon").hidden = true;
+  const article = $("metadeck");
+  article.hidden = false;
+  article.classList.remove("enter");
+  void article.offsetWidth;
+  article.classList.add("enter");
+
+  $("metadeck-kicker").textContent = `${data.label} · meta deck`;
+  $("metadeck-name").textContent = arch.name;
+  $("metadeck-type").textContent =
+    `${arch.share.toFixed(1)}% of the meta · ${arch.decks.toLocaleString()} deck${arch.decks === 1 ? "" : "s"}`
+    + (arch.paper_price ? ` · ${money(arch.paper_price)} to buy outright` : "");
+  $("metadeck-identity").innerHTML = pips(arch.colors);
+
+  const short = arch.needed_copies - arch.owned_copies;
+  $("metadeck-coverage").textContent = pct(arch.coverage);
+  $("metadeck-coverage-bar").style.width = `${Math.round(arch.coverage * 100)}%`;
+  $("metadeck-coverage-line").textContent =
+    `${arch.owned_copies} of ${arch.needed_copies} copies owned · ${short} to go`;
+
+  const cost = $("metadeck-cost");
+  cost.replaceChildren();
+  const chip = (label, value) => {
+    const el = document.createElement("span");
+    el.className = "theme-chip";
+    el.innerHTML = "<b></b><i></i>";
+    el.querySelector("b").textContent = label;
+    el.querySelector("i").textContent = value;
+    cost.append(el);
+  };
+  if (!short) chip("Nothing", "you own it all");
+  if (isArena()) {
+    WILDCARD_ORDER.filter((r) => arch.wildcards[r]).forEach((r) => chip(r, arch.wildcards[r]));
+  }
+  if (short) chip("Paper", money(arch.cost_usd));
+  if (arch.sideboard_missing.length) chip("+ sideboard", money(arch.sideboard_cost_usd));
+  $("metadeck-cost-note").textContent = isArena()
+    ? "Wildcards by rarity for the main deck, and what the gaps cost in paper"
+    : "What the main-deck gaps cost in paper, and the sideboard on top";
+
+  const grid = $("metadeck-missing");
+  grid.replaceChildren();
+  const column = (title, gaps, total) => {
+    if (!gaps.length) return;
+    const col = document.createElement("section");
+    col.className = "rec-col is-buy enter";
+    col.innerHTML = `<div class="rec-head"><h4></h4><p></p></div>`;
+    const copies = gaps.reduce((n, g) => n + g.short, 0);
+    col.querySelector("h4").textContent = `${title} (${copies})`;
+    col.querySelector("p").textContent = `${money(total)} for all of it`;
+    gaps.forEach((g) => {
+      const row = document.createElement("div");
+      row.className = "rec";
+      row.innerHTML = `<span class="rec-role">${g.short}×</span><span class="rec-name"></span>
+        <span class="rec-price rec-rarity"></span><span class="rec-price">${g.price ? money(g.price * g.short) : "—"}</span>`;
+      row.querySelector(".rec-name").textContent = g.name;
+      const rarity = row.querySelector(".rec-rarity");
+      rarity.textContent = g.rarity ? g.rarity[0].toUpperCase() : "";
+      rarity.dataset.rarity = g.rarity;
+      row.title = `${g.name}: the list runs ${g.need}, you own ${g.have}`
+        + (g.rarity ? ` · ${g.rarity}` : "") + (g.price ? ` · ${money(g.price)} each` : "");
+      attachPreview(row, g.image_url);
+      col.append(row);
+    });
+    grid.append(col);
+  };
+  column("Main deck", arch.missing, arch.cost_usd);
+  column("Sideboard", arch.sideboard_missing, arch.sideboard_cost_usd);
+  if (!grid.children.length) {
+    grid.innerHTML = '<p class="rec-empty">You own every card in this list. Copy it and play.</p>';
+  }
+
+  $("metadeck-link").href = arch.url;
+  article.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+$("copy-metadeck").addEventListener("click", async () => {
+  if (!state.metaDeck) return;
+  await navigator.clipboard.writeText(state.metaDeck.decklist);
+  flash($("copy-metadeck"), "Copied");
+});
+
+$("copy-metadeck-missing").addEventListener("click", async () => {
+  if (!state.metaDeck) return;
+  const lines = [...state.metaDeck.missing, ...state.metaDeck.sideboard_missing]
+    .map((g) => `${g.short} ${g.name}`);
+  await navigator.clipboard.writeText(lines.join("\n") + "\n");
+  flash($("copy-metadeck-missing"), "Copied");
+});
+
+$("download-metadeck").addEventListener("click", () => {
+  if (!state.metaDeck) return;
+  const blob = new Blob([state.metaDeck.decklist], { type: "text/plain" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `${state.metaDeck.slug}.txt`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+});
+
 // ── Deck rendering ──────────────────────────────────────────────────────────
 
 function renderDeck(deck) {
   $("empty").hidden = true;
   $("precon").hidden = true;
+  $("metadeck").hidden = true;
   $("deck").hidden = false;
   $("deck").classList.remove("enter");
   void $("deck").offsetWidth;

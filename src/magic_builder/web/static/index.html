@@ -54,6 +54,19 @@
       </label>
     </section>
 
+    <section class="panel" id="meta-panel" hidden>
+      <h2 class="panel-title">Meta decks</h2>
+      <div class="meta-formats" id="meta-formats" role="group" aria-label="Meta format">
+        <button class="meta-fmt" data-meta="standard" aria-pressed="false">Standard</button>
+        <button class="meta-fmt" data-meta="pauper" aria-pressed="false">Pauper</button>
+        <button class="meta-fmt" data-meta="modern" aria-pressed="false">Modern</button>
+        <button class="meta-fmt" data-meta="brawl" aria-pressed="false">Brawl</button>
+        <button class="meta-fmt" data-meta="commander" aria-pressed="false">Commander</button>
+      </div>
+      <p class="pane-note" id="meta-note"></p>
+      <div class="cmd-list" id="meta-list"></div>
+    </section>
+
     <section class="panel" id="build-panel" hidden>
       <h2 class="panel-title">2 · Format</h2>
 
@@ -62,6 +75,7 @@
         <button class="tab" role="tab" aria-selected="false" data-format="brawl">Brawl</button>
         <button class="tab" role="tab" aria-selected="false" data-format="standard">Standard</button>
         <button class="tab" role="tab" aria-selected="false" data-format="pauper">Pauper</button>
+        <button class="tab" role="tab" aria-selected="false" data-format="modern">Modern</button>
       </div>
 
       <div class="tabpane" id="pane-commander">
@@ -111,7 +125,7 @@
       <ol class="empty-steps">
         <li><span>Export</span> your collection from ManaBox or scrape it from Arena.</li>
         <li><span>Drop</span> the file in the panel on the left.</li>
-        <li><span>Build</span> a 100-card Commander or Brawl deck, or a 60-card Standard or Pauper list.</li>
+        <li><span>Build</span> a 100-card Commander or Brawl deck, or a 60-card Standard, Pauper or Modern list — or see which deck in the current meta you are closest to.</li>
       </ol>
     </div>
 
@@ -178,6 +192,53 @@
         <button class="ghost" id="copy-precon-after">Copy list after swaps</button>
         <button class="ghost" id="copy-buylist">Copy buy list</button>
         <button class="ghost" id="download-precon-after">Download .txt</button>
+      </div>
+    </article>
+
+    <article class="deck metadeck" id="metadeck" hidden>
+      <div class="plate">
+        <div class="plate-rows">
+          <p class="plate-kicker" id="metadeck-kicker">Meta deck</p>
+          <h2 class="plate-name" id="metadeck-name"></h2>
+          <p class="plate-type" id="metadeck-type"></p>
+        </div>
+        <div class="plate-pips" id="metadeck-identity"></div>
+      </div>
+
+      <div class="readout">
+        <div class="figure">
+          <div class="figure-head">
+            <h3>How much you own</h3>
+            <p class="figure-note">Copies of the main deck in your collection. Basic lands are not counted.</p>
+          </div>
+          <div class="coverage">
+            <span class="coverage-pct" id="metadeck-coverage"></span>
+            <span class="coverage-bar"><i id="metadeck-coverage-bar"></i></span>
+            <span class="coverage-line" id="metadeck-coverage-line"></span>
+          </div>
+        </div>
+        <div class="figure">
+          <div class="figure-head">
+            <h3>To finish it</h3>
+            <p class="figure-note" id="metadeck-cost-note"></p>
+          </div>
+          <div class="theme-chips" id="metadeck-cost"></div>
+        </div>
+      </div>
+
+      <section class="meta-missing">
+        <div class="figure-head">
+          <h3>What's missing</h3>
+          <p class="figure-note">MTGGoldfish's representative list for the archetype, against what you own. Dearest gap first, priced at Scryfall's cheapest printing in USD.</p>
+        </div>
+        <div class="recs-grid" id="metadeck-missing"></div>
+      </section>
+
+      <div class="deck-actions">
+        <button class="ghost" id="copy-metadeck">Copy deck list</button>
+        <button class="ghost" id="copy-metadeck-missing">Copy missing cards</button>
+        <button class="ghost" id="download-metadeck">Download .txt</button>
+        <a class="ghost" id="metadeck-link" target="_blank" rel="noopener">On MTGGoldfish ↗</a>
       </div>
     </article>
 
