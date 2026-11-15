@@ -27,6 +27,10 @@ After touching `analysis/`, re-score the saved decklists in `decks/` and check t
 - Subpackage `__init__.py` files must stay empty (except `collection/`): `builders` ↔ `analysis` is a package-level import cycle that only works because nothing is imported at package init.
 - `scripts/` is stdlib-only and runs with system `python3`, not the venv.
 
+## Meta decks (MTGGoldfish)
+
+`data/mtggoldfish.py` scrapes `/metagame/<fmt>/full` tiles and reads each archetype's list from the hidden `deck_input_deck` input — `/deck/download/<id>` is behind a Cloudflare challenge, don't switch to it. A metagame page that parses to zero tiles raises instead of caching (a redesign must not hide behind a 2-day cache). Coverage in `analysis/meta.py` counts copies summed across printings, basics excluded, main deck only; if a page change silently drops cards from a list, coverage inflates — spot-check one archetype by hand after touching the parser.
+
 ## Collections are personal data — never commit them
 
 `ManaBox_Collection*.csv`, `collection*.csv` and `arena-export/` are gitignored. This is a public repo and the history has already been purged once with `git filter-repo`; don't add exceptions, don't `git add -f`, and check `git status --ignored` before a commit that touches new data files.

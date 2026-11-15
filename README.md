@@ -8,8 +8,8 @@ Builds a Commander, Brawl, Standard or Pauper deck from your collection using Sc
 
 - Parses three collection formats, auto-detected: ManaBox CSV, Arena deck export (`N Card Name (SET) ###`), and an Arena collection CSV (`grp_id,name,set,collector_number,quantity,...`) as produced from an [mtga-export](https://github.com/PBernaerts/mtga-export) dump — see below
 - Enriches every card with Scryfall data (type, oracle text, keywords, CMC, P/T, mana cost, rarity, legalities, USD price)
-- **Four formats** (`--format`), defined in `formats.py`: `commander` and `brawl` (1 commander + 99, singleton) and `standard` and `pauper` (60 cards, 4-of, plus a sideboard). Each is just a Scryfall legality key, a deck size, a copy cap and a sideboard size, so the two builders stay generic.
-- **Constructed mode** (`--format standard` / `pauper`): merges printings with a 4-copy cap, auto-picks the strongest mono- or two-color identity (rate + synergy-pair scoring: lifegain sources ↔ payoffs, tokens ↔ anthems), fills the curve with a guaranteed interaction floor, builds a mana base from owned duals + weighted basics, then fills a 15-card sideboard from the leftovers, favouring answers the maindeck can't afford (artifact/enchantment removal, graveyard hate, counterspells)
+- **Five formats** (`--format`), defined in `formats.py`: `commander` and `brawl` (1 commander + 99, singleton) and `standard`, `pauper` and `modern` (60 cards, 4-of, plus a sideboard). Each is just a Scryfall legality key, a deck size, a copy cap and a sideboard size, so the two builders stay generic.
+- **Constructed mode** (`--format standard` / `pauper` / `modern`): merges printings with a 4-copy cap, auto-picks the strongest mono- or two-color identity (rate + synergy-pair scoring: lifegain sources ↔ payoffs, tokens ↔ anthems), fills the curve with a guaranteed interaction floor, builds a mana base from owned duals + weighted basics, then fills a 15-card sideboard from the leftovers, favouring answers the maindeck can't afford (artifact/enchantment removal, graveyard hate, counterspells)
 - **Deck names** decks the way players do — colour identity plus the theme the builder's own scoring actually followed: "Orzhov Lifegain", "Golgari Elves", "Mono-Red Aggro". Falls back to a shape word (Aggro / Midrange / Control / Ramp) when no theme has enough cards behind it to claim.
 - **Prices** from Scryfall on every card, deck and recommendation, using the cheapest printing of each name. The collection panel shows what the whole collection is worth; the acquisition list shows what the missing cards would cost.
 - Scores and ranks commander candidates by collection coverage, optionally weighted by EDHREC deck counts (on by default in the CLI, a toggle in the web UI)
@@ -22,6 +22,7 @@ Builds a Commander, Brawl, Standard or Pauper deck from your collection using Sc
 - Auto-distributes basic lands weighted by color demand of non-land cards
 - **Commander bracket (1-5)** estimated for every Commander and Brawl deck, with the evidence behind it — see below
 - EDHREC recommendation pass on finished Commander decks: splits what other players run into **upgrades** (cards you own that the builder skipped) and **acquisitions** (cards you don't own that most decks with this commander run), each labelled Staple / Flex / Tech by inclusion rate, with a synergy score and a price. Cached on disk for a week.
+- **Meta decks** (`--meta FORMAT`): ranks the current MTGGoldfish archetypes for Standard, Pauper, Modern, Brawl or Commander by how much of each list you already own, with the missing cards and what they cost in paper dollars and Arena wildcards — see below
 - Web UI (`magic-builder-web`): upload a collection, pick a format and a commander or colours, read the deck with its name, price, mana curve, pip demand, sideboard, EDHREC recommendations, and card art previews
 - MCP server exposing four tools Claude can call directly
 
@@ -109,6 +110,20 @@ magic-builder ManaBox_Collection.csv --precons \
 
 Each report ends with a **worth buying** section: cards you don't own that other players put in the deck, priced at Scryfall's cheapest printing and grouped into tiers (under $1, $1–3, $3–10, $10+), ranked by how often EDHREC's upgraded lists add them. Output is `precon_swaps.txt` plus one `precon_swaps.<slug>.decklist.txt` per precon — the list after the swaps, ready to import. `decks/PRECON_SWAPS.md` holds a hand-reviewed pass over the same pool for the three precons in the September 2026 collection and notes where it disagrees with the scorer; `decks/PRECON_BUYLIST.md` groups the buy list into budget packages.
 
+### Meta decks
+
+```bash
+# Which of the current Standard meta decks is this Arena collection closest to?
+magic-builder collection_from_logs.csv --meta standard
+
+# Same question for paper: pauper, modern, commander (brawl is Arena's Historic Brawl)
+magic-builder ManaBox_Collection.csv --meta pauper
+```
+
+`--meta` reads MTGGoldfish's metagame page for the format (`/metagame/<format>/full`): the most-played archetypes, each with its share of the meta, how many decks that share comes from, and a representative list. The 30 most-played lists are compared against the collection by **copies**, not names: a deck that runs four Llanowar Elves needs four, and printings of the same card are added together. Basic lands are free and left out of the score, and only the main deck counts; sideboard gaps are listed separately. Missing cards are priced at Scryfall's cheapest printing and counted as wildcards by rarity. That rarity also comes from the cheapest printing, so a card reprinted at a lower rarity on paper can read one step cheaper than its Arena wildcard. The report prints the closest 15. The closest list is saved as `deck_output.decklist.txt`, in Arena import format with front-face names only.
+
+MTGGoldfish has no API. The list comes from the hidden `deck_input_deck` field on each archetype page, because `/deck/download/<id>` sits behind a Cloudflare challenge. Metagame pages are cached under `.cache/mtggoldfish/` for two days and lists for a week. A cold format makes about 31 requests, three at a time. Brawl and Commander share counts come from very few decks (often 1–10), so read them as "popular right now", not as a tournament meta.
+
 ## Commander brackets
 
 Every Commander and Brawl deck is scored against WotC's bracket scale — 1 Exhibition, 2 Core, 3 Upgraded, 4 Optimized, 5 cEDH — and reported with the cards that decided it. Each bracket pairs an expected game length (9+, 8+, 6+, 4+ turns, then any) with a list of what a deck may contain, so the panel shows every criterion and marks the ones that fired:
@@ -155,7 +170,7 @@ The combo check is the only part that needs the network. The CLI skips it under 
 
 ## Web UI
 
-A browser front end for the same builders: drop in a collection file, pick one of the four formats and a commander or a colour pair, get the named deck back with its paper price, mana curve, pip demand, sideboard, card art on hover, and copy/download buttons. Commander and Brawl decks then load a **What other players run** section — EDHREC's upgrades and acquisitions, each tagged Staple / Flex / Tech and priced. When the collection contains a precon, a **Precons you own** panel appears in the rail; picking one shows its themes, bracket and CRISPI before and after, the swaps with their reasons, and a copy/download of the post-swap list.
+A browser front end for the same builders: drop in a collection file, pick one of the five formats and a commander or a colour pair, get the named deck back with its paper price, mana curve, pip demand, sideboard, card art on hover, and copy/download buttons. Commander and Brawl decks then load a **What other players run** section — EDHREC's upgrades and acquisitions, each tagged Staple / Flex / Tech and priced. A **Meta decks** panel ranks the current MTGGoldfish archetypes for the chosen format (Standard by default for Arena uploads, Commander for ManaBox) by how much of each you own; picking one shows the coverage, the missing cards with their rarity and price, the wildcard and paper cost to finish it, and a copy/download of the list. When the collection contains a precon, a **Precons you own** panel appears in the rail; picking one shows its themes, bracket and CRISPI before and after, the swaps with their reasons, and a copy/download of the post-swap list.
 
 ```bash
 magic-builder-web             # http://127.0.0.1:8000
@@ -170,8 +185,9 @@ The Scryfall database loads once in the background at startup — the header sho
 | `POST /api/collection` | Upload a collection file, returns an id plus collection stats |
 | `GET /api/collection/{id}/commanders` | Ranked commander candidates (`?edhrec=true` adds popularity weighting, `?fmt=` picks commander or brawl) |
 | `POST /api/collection/{id}/deck/commander` | Build a 100-card singleton deck (`commander_name`, `fmt`: commander \| brawl, `target_bracket`: 1-5) |
-| `POST /api/collection/{id}/deck/standard` | Build a 60-card deck plus sideboard (`colors`, `fmt`: standard \| pauper) |
+| `POST /api/collection/{id}/deck/standard` | Build a 60-card deck plus sideboard (`colors`, `fmt`: standard \| pauper \| modern) |
 | `GET /api/collection/{id}/recommendations` | EDHREC upgrades and acquisitions for a built deck (`commander`, `limit`, `refresh`) |
+| `GET /api/collection/{id}/meta/{fmt}` | The format's most-played MTGGoldfish archetypes, closest to the collection first: coverage, missing cards, wildcards, USD, decklist (`fmt`: standard \| pauper \| modern \| brawl \| commander, `limit` ≤ 60, `refresh`) |
 | `GET /api/collection/{id}/precons` | Preconstructed decks detected in the collection (`refresh`) |
 | `GET /api/collection/{id}/precons/{slug}/swaps` | Swaps for one detected precon: cuts, cards you own to put in, themes, bracket before/after, and the post-swap list (`limit`, `include_deck_cards`, `commanders` as `A // B`) |
 
@@ -247,7 +263,8 @@ magic_builder/
 │   ├── data/                     # External data sources
 │   │   ├── scryfall.py           # Scryfall bulk data download + enrichment (.cache/*.jsonl.gz)
 │   │   ├── scryfall_query.py     # Partial Scryfall-syntax reader, for combo template requirements
-│   │   └── edhrec.py             # EDHREC upgrade / acquisition recommendations (.cache/edhrec/)
+│   │   ├── edhrec.py             # EDHREC upgrade / acquisition recommendations (.cache/edhrec/)
+│   │   └── mtggoldfish.py        # Current metagame + archetype lists from MTGGoldfish (.cache/mtggoldfish/)
 │   ├── builders/
 │   │   ├── formats.py            # Format specs: legality key, deck size, copy cap, sideboard
 │   │   ├── archetype.py          # Colour-combo names (Azorius, Jund...) and deck naming
@@ -258,6 +275,7 @@ magic_builder/
 │   │   ├── brackets.py           # Commander bracket (1-5) estimation and its criteria
 │   │   ├── crispi.py             # CRISPI (Consistency, Resilience, Interaction, Speed) scoring
 │   │   ├── combos.py             # Two-card combo lookup via Commander Spellbook (.cache/combos/)
+│   │   ├── meta.py               # Meta decks: coverage of each archetype list by owned copies, cost to finish
 │   │   └── precons.py            # Precon detection (EDHREC's precon index) and swap suggestions
 │   └── web/
 │       ├── app.py                # `magic-builder-web`: FastAPI web UI + JSON API
