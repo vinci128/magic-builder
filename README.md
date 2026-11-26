@@ -1,7 +1,8 @@
 # Magic Deck Builder
 
-**[vinci128.github.io/magic-builder](https://vinci128.github.io/magic-builder/)** — a page with real
-output, if you would rather look before installing. ·
+**[Open the web app](https://magic-builder.onrender.com)** — upload a collection export, get a deck.
+Nothing to install. ·
+[Landing page](https://vinci128.github.io/magic-builder/) ·
 [PyPI](https://pypi.org/project/magic-builder/)
 
 [![ko-fi](https://img.shields.io/badge/support-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/vinci128)
@@ -234,9 +235,11 @@ The Scryfall database loads once in the background at startup — the header sho
 
 Collections live in memory only — nothing is written to disk, and the 20 most recent uploads are kept.
 
-## Deployment
+## The web UI
 
-The web UI runs at **https://magic-builder.onrender.com**.
+It is deployed at **https://magic-builder.onrender.com** — on Render's free tier, so the first
+request after a quiet spell takes about half a minute while the instance wakes. Uploads live in
+memory only, the 20 most recent, and are gone on restart.
 
 `render.yaml` deploys it to [Render](https://render.com) as a free-tier web
 service. In the Render dashboard: **New → Blueprint**, point it at this repo,
