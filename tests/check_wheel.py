@@ -36,10 +36,19 @@ JUNK_NAMES = {"scryfall_default_cards.jsonl.gz", "scryfall_default_cards.json"}
 
 
 def build_wheel(outdir: Path) -> Path:
+    """Build with `python -m build`, not with whatever the author happens to have installed.
+
+    This used `uv build` and died on a GitHub runner with `FileNotFoundError: 'uv'` — a check that
+    depends on one person's toolchain verifies one person's machine. `build` is declared in the dev
+    extra, so `pip install -e ".[dev]"` is the only prerequisite.
+    """
     print("  building a wheel...")
-    r = subprocess.run(["uv", "build", "--wheel", "--out-dir", str(outdir)],
+    r = subprocess.run([sys.executable, "-m", "build", "--wheel", "--outdir", str(outdir)],
                        cwd=REPO, capture_output=True, text=True)
     if r.returncode != 0:
+        if "No module named build" in r.stderr:
+            raise SystemExit("  the 'build' package is missing:\n"
+                             "    pip install -e \".[dev]\"   (it is in the dev extra)")
         print(r.stdout[-2000:])
         print(r.stderr[-2000:])
         raise SystemExit("  build failed")

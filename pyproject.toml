@@ -23,7 +23,7 @@ magic-builder-mcp = "magic_builder.mcp_server:main"
 [project.optional-dependencies]
 # The test suite. Separate from the runtime deps because nothing it needs ships to a user: the parser
 # tests are hermetic (committed fixtures, no network, no Scryfall cache) and take under a second.
-dev = ["pytest>=8.0", "ruff>=0.6"]
+dev = ["pytest>=8.0", "ruff>=0.6", "build>=1.2"]
 
 [build-system]
 requires = ["hatchling"]
