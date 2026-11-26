@@ -3,6 +3,7 @@ from pathlib import Path
 
 import click
 
+from magic_builder import paths
 from magic_builder.analysis import brackets, crispi, meta, precons
 from magic_builder.analysis.combos import find_combos
 from magic_builder.builders import formats
@@ -26,8 +27,40 @@ from magic_builder.data.scryfall import (
 from magic_builder.output import print_and_save, print_and_save_standard
 
 
+def _version() -> str:
+    """The installed version, or `unknown` — never a guess.
+
+    Read from the package metadata rather than a literal, so it cannot disagree with what pip installed.
+    A number typed into the source is a number that goes stale the first time someone forgets it.
+    """
+    try:
+        from importlib.metadata import version
+        return version("magic-builder")
+    except Exception:
+        return "unknown"
+
+
+def _print_version(ctx, param, value):
+    """`--version`: the version, and the Python it is running on.
+
+    The interpreter matters here more than usual — the Scryfall bulk file and CatBoost-style wheels are
+    where a version floor bites — so printing both turns "it does not work" into a checkable fact.
+    """
+    if not value or ctx.resilient_parsing:
+        return
+    click.echo(f"magic-builder {_version()} (python {sys.version.split()[0]})")
+    ctx.exit()
+
+
+
 @click.command()
 @click.argument("collection_path", default="ManaBox_Collection.csv")
+@click.option("--demo", is_flag=True,
+              help="Build from a small bundled example collection — no file needed, nothing to "
+                   "export. The quickest way to see what this does.")
+@click.option("--version", is_flag=True, is_eager=True, expose_value=False,
+              callback=_print_version,
+              help="Show the version and exit.")
 @click.option("--output", "-o", default="deck_output.txt", show_default=True, help="Output file path.")
 @click.option("--no-recs", "--no-ai", "no_recs", is_flag=True,
               help="Skip the EDHREC recommendation pass (works offline).")
@@ -85,14 +118,28 @@ from magic_builder.output import print_and_save, print_and_save_standard
          "archetypes by how much of each list you own, with what is missing and "
          "what it costs. Saves the closest list to --output.",
 )
-def main(collection_path: str, output: str, no_recs: bool, fmt: str, colors: str | None,
+def main(collection_path: str, demo: bool, output: str, no_recs: bool, fmt: str, colors: str | None,
          pick: int, target_bracket: int | None, precons_mode: bool,
          include_deck_cards: bool, precon_commanders: str | None, meta_fmt: str | None):
     """Build a Commander, Brawl, Standard, Pauper or Modern deck from your collection.
 
+    \b
+    New here? Try it without exporting anything:
+
+        magic-builder --demo
+
+    That builds from a small example collection bundled with the program. When you want your own
+    cards, export your collection from ManaBox (or MTG Arena) and pass the file:
+
+    \b
+        magic-builder ~/Downloads/ManaBox_Collection.csv -o my_deck.txt
+
     Accepts a ManaBox CSV export, an MTG Arena deck export
     (lines of the form: N Card Name (SET) collector#), or an Arena
     collection CSV scraped from Player.log.
+
+    The first run downloads Scryfall's card database (~80 MB, cached for a week) —
+    that is the only time it does.
 
     With --precons it does something else with the same file: recognises the
     precons you own and says what to swap into each. With --meta FORMAT it
@@ -103,6 +150,32 @@ def main(collection_path: str, output: str, no_recs: bool, fmt: str, colors: str
         click.echo(f"--target-bracket is a Commander framework and does not apply "
                    f"to {spec.label}.", err=True)
         sys.exit(1)
+
+    # ── 0. Where the cards come from ───────────────────────────────────────
+    # The order matters: an explicit path wins, then --demo, then the default name. A path the user
+    # typed is never overridden by a flag they also typed by accident without us saying so.
+    if demo and collection_path != "ManaBox_Collection.csv":
+        raise click.UsageError("--demo builds from the bundled example; do not also pass a file.")
+    if demo:
+        collection_path = str(paths.example_collection())
+        if not Path(collection_path).exists():
+            # Only reachable from a broken install, and worth its own message: the fix is to reinstall,
+            # not to find a file.
+            raise click.ClickException(
+                "the bundled example collection is missing from this installation — "
+                "reinstall magic-builder, or pass your own collection file."
+            )
+    elif not Path(collection_path).exists():
+        # The first thing anyone does is run the command with no arguments, and the default name does
+        # not exist on a machine that has never exported anything. A traceback there is the worst
+        # possible introduction, so say what to do instead.
+        raise click.ClickException(
+            f"no collection file at {collection_path!r}.\n"
+            f"  To try it first with no setup:      magic-builder --demo\n"
+            f"  To use your own cards:              magic-builder <your-export.csv>\n"
+            f"  Supported exports: a ManaBox CSV, an MTG Arena deck export, or an Arena\n"
+            f"  collection CSV from Player.log. See the README for where to get each."
+        )
 
     # ── 1. Parse collection ────────────────────────────────────────────────
     print(f"Parsing collection: {collection_path}")

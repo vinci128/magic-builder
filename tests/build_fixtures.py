@@ -18,8 +18,9 @@ recursion, and basics. It is not anybody's real collection and it is not a good 
 exercise every code path and to produce output.
 
 Usage:  python tests/build_fixtures.py
-Writes: tests/fixtures/{collection_manabox.csv, collection_arena.txt, collection_arena_log.csv,
-                        scryfall_index.json}
+Writes: src/magic_builder/data/example_collection.csv   (ships; `--demo` and the README use it)
+        tests/fixtures/{collection_arena.txt, collection_arena_log.csv, scryfall_index.json,
+                        expected_cards.json}          (test-only)
 """
 
 from __future__ import annotations
@@ -33,6 +34,10 @@ from pathlib import Path
 HERE = Path(__file__).parent / "fixtures"
 REPO = Path(__file__).resolve().parents[1]
 CACHE = REPO / ".cache" / "scryfall_default_cards.jsonl.gz"
+# The ManaBox example is written into the *package*, not the test directory, because it is shipped:
+# `magic-builder --demo` builds from it, and the README points at it. One file, two jobs — an example a
+# stranger can run and the input the parser tests parse. Duplicating it here would let the two drift.
+EXAMPLE = REPO / "src" / "magic_builder" / "data" / "example_binder.csv"
 
 # (name, quantity) — a coherent if unambitious black-red list.
 CARDS: list[tuple[str, int]] = [
@@ -131,8 +136,10 @@ def main() -> None:
         print(f"  {name:<34} {d['set']:>5} {d['collector_number']!s:>4}  {d['id'][:8]}  "
               f"{d.get('set_type','')}")
 
-    # 1. ManaBox CSV: the columns the parser reads, in the order a real export has them.
-    with (HERE / "collection_manabox.csv").open("w", newline="", encoding="utf-8") as f:
+    # 1. ManaBox CSV: the columns the parser reads, in the order a real export has them. Goes to the
+    #    package so it ships.
+    EXAMPLE.parent.mkdir(parents=True, exist_ok=True)
+    with EXAMPLE.open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["Name", "Set code", "Set name", "Collector number", "Foil", "Quantity",
                     "Scryfall ID", "Binder Name"])
@@ -166,8 +173,10 @@ def main() -> None:
         json.dumps(sorted(d["name"] for d, _ in fetched), indent=1, ensure_ascii=False) + "\n",
         encoding="utf-8")
 
-    print(f"\n  {len(fetched)} distinct cards, {sum(q for _, q in fetched)} physical cards, "
-          f"5 fixture files")
+    print(f"\n  {len(fetched)} distinct cards, {sum(q for _, q in fetched)} physical cards")
+    print(f"  example (ships)   {EXAMPLE.relative_to(REPO)}")
+    print(f"  test fixtures     {HERE.relative_to(REPO)}/ (arena.txt, arena_log.csv, scryfall_index, "
+          f"expected_cards)")
 
 
 if __name__ == "__main__":

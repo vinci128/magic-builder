@@ -28,7 +28,11 @@ from magic_builder.collection.arena import (
 from magic_builder.collection.manabox import parse_collection
 
 FIXTURES = Path(__file__).parent / "fixtures"
-MANABOX = FIXTURES / "collection_manabox.csv"
+# The ManaBox example lives in the package, not here, because it ships: `magic-builder --demo` builds
+# from exactly this file. Testing the shipped copy means the demo cannot rot without a test noticing.
+from magic_builder.paths import example_collection as _example  # noqa: E402
+
+MANABOX = _example()
 ARENA = FIXTURES / "collection_arena.txt"
 ARENA_LOG = FIXTURES / "collection_arena_log.csv"
 
@@ -83,6 +87,13 @@ def test_unknown_format_is_not_silently_treated_as_arena(tmp_path):
 
 
 # ---------------------------------------------------------------- ManaBox
+
+def test_the_shipped_example_is_where_the_cli_expects_it():
+    """`--demo` points at this path, so the file being in the package is a contract, not a detail."""
+    assert MANABOX.exists()
+    assert MANABOX.parent.name == "data"
+    assert MANABOX.parent.parent.name == "magic_builder"
+
 
 def test_manabox_reads_the_fixture():
     cards = parse_collection(str(MANABOX))
@@ -281,7 +292,6 @@ MAX_FIXTURE_CARDS = 200
 # because the thing being prevented is an *extra* file — a real export someone copied in — and a check
 # that only inspects the files it already knows about cannot see one.
 ALLOWED_FIXTURE_FILES = {
-    "collection_manabox.csv",
     "collection_arena.txt",
     "collection_arena_log.csv",
     "scryfall_index.json",
@@ -315,7 +325,7 @@ def test_fixtures_contain_exactly_the_synthetic_cards():
     index_raw = json.loads((FIXTURES / "scryfall_index.json").read_text(encoding="utf-8"))
     index = {tuple(k.split("|")): v for k, v in index_raw.items()}
     parsed = {
-        "collection_manabox.csv": parse_collection(str(MANABOX)),
+        "data/example_collection.csv": parse_collection(str(MANABOX)),
         "collection_arena.txt": parse_arena_collection(str(ARENA), index),
         "collection_arena_log.csv": parse_arena_log_csv(str(ARENA_LOG), index),
     }

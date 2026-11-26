@@ -37,13 +37,20 @@ jobs:
       - name: The parsers
         run: python -m pytest -q
 
+      - name: The wheel contains what the package contains
+        # The bug this catches shipped once already: a package data file matched a .gitignore rule, so
+        # hatchling left it out of the wheel and --demo broke for everyone who installed the package,
+        # while passing every test in a checkout.
+        run: python tests/check_wheel.py
+
   fresh-install:
     # A separate job because it asks a different question: not "is the code right" but "can a stranger
-    # start". It installs from a clean checkout and builds a deck from the committed fixture — no
-    # personal collection, no network, no EDHREC pass.
+    # start". It installs from a clean checkout and builds a deck with no personal collection, no
+    # network, and no EDHREC pass.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
@@ -53,10 +60,35 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install .
 
+      - name: Version and demo work from an install
+        # --demo reads a file that ships inside the package, which is exactly what a .gitignore rule or
+        # a packaging default can silently drop. It gets its own step because a failure here is
+        # invisible to every other check.
+        run: |
+          set -euo pipefail
+          magic-builder --version | grep -q "^magic-builder "
+          magic-builder --demo --no-recs -o /tmp/demo.txt
+          total=$(awk '{s+=$1} END {print s}' /tmp/demo.decklist.txt)
+          echo "demo deck: $total cards"
+          test "$total" -eq 100
+
+      - name: The cache stays out of the working directory
+        # It used to default to ./.cache, so the tool dropped 80 MB into whatever directory it ran from
+        # and re-downloaded there. Silent when it works, which is why it is checked.
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/elsewhere
+          cd /tmp/elsewhere
+          python -c "from magic_builder import paths; print(paths.CACHE_ROOT)"
+          if [ -d /tmp/elsewhere/.cache ]; then
+            echo "::error::the tool created a .cache in the working directory"
+            exit 1
+          fi
+
       - name: Build a deck from the committed fixture
         run: |
           set -euo pipefail
-          magic-builder tests/fixtures/collection_manabox.csv --no-recs -o /tmp/deck.txt
+          magic-builder tests/fixtures/collection_arena.txt --no-recs -o /tmp/deck.txt
           test -s /tmp/deck.txt
           # A Commander deck is exactly 100 cards, and the decklist is the machine-readable half.
           test -f /tmp/deck.decklist.txt
@@ -64,19 +96,7 @@ jobs:
           echo "deck size: $total"
           test "$total" -eq 100
 
-      - name: The same fixture in all three formats
-        # The fixtures encode one collection in three shapes, so all three must produce the same deck.
-        # A per-format test passes while a format quietly drops a column it was not looking at.
-        run: |
-          set -euo pipefail
-          for f in collection_arena.txt collection_arena_log.csv; do
-            magic-builder "tests/fixtures/$f" --no-recs -o "/tmp/$f.txt"
-            total=$(awk '{s+=$1} END {print s}' "/tmp/$f.decklist.txt")
-            echo "$f -> $total cards"
-            test "$total" -eq 100
-          done
-
-      - name: Refuse a file in no known format
+      - name: A file in no known format is refused
         # The failure worth guarding: a wrong file used to be parsed as an Arena export and reported as
         # "Found 0 unique card(s)", which reads as a fact about the collection instead of about the file.
         run: |
@@ -88,3 +108,20 @@ jobs:
           fi
           cat /tmp/err.txt
           grep -q "is not a collection file I recognise" /tmp/err.txt
+
+      - name: A missing collection file says what to do
+        # The first thing anyone runs is the bare command, in a directory with no export in it.
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/empty
+          cd /tmp/empty
+          if magic-builder 2>/tmp/nf.txt; then
+            echo "::error::running with no collection file succeeded"
+            exit 1
+          fi
+          cat /tmp/nf.txt
+          if grep -q "Traceback" /tmp/nf.txt; then
+            echo "::error::a traceback reached the user"
+            exit 1
+          fi
+          grep -q -- "--demo" /tmp/nf.txt

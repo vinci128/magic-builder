@@ -28,19 +28,48 @@ Builds a Commander, Brawl, Standard or Pauper deck from your collection using Sc
 
 ## Setup
 
+**Nothing, to have a look.** There is a small example collection bundled with the program:
+
 ```bash
-# Clone the repo
+uvx --from git+https://github.com/vinci128/magic-builder magic-builder --demo
+```
+
+That builds a real 100-card Commander deck from 29 example cards, so you can see the output before
+exporting anything of your own. The first run downloads Scryfall's card database (below); that is the
+only time.
+
+**Your own cards.** Export your collection from ManaBox as a CSV and pass it — nothing needs to be in
+the project directory:
+
+```bash
+magic-builder ~/Downloads/ManaBox_Collection.csv -o my_deck.txt
+```
+
+Running the bare `magic-builder` with no file in the current directory says exactly this rather than
+failing: it will not guess.
+
+**From a checkout**, for development:
+
+```bash
 git clone https://github.com/vinci128/magic-builder
 cd magic-builder
 
-# Create a virtual environment and install the package (editable, with its CLI entry points)
+# A virtual environment with the CLI entry points, editable
 uv venv .venv
-uv pip install -e .
+uv pip install -e ".[dev]"
+uv run pytest                      # the parser suite: hermetic, no network, well under a second
+python tests/check_wheel.py        # everything in the package actually ships in the wheel
 ```
 
-Export your collection from ManaBox as a CSV and place it in the project directory. Collection files are personal data and are gitignored (`ManaBox_Collection*.csv`, `collection*.csv`, `arena-export/`).
+Collection files are personal data and are gitignored (`ManaBox_Collection*.csv`, `collection*.csv`,
+`*_collection.csv`, `arena-export/`). Keep your exports out of `src/` and `tests/` — the ignore rules
+protect you by name, and a file named like an example would be committed.
 
-On its first run the builder downloads Scryfall's bulk card database (~80 MB gzipped) into `.cache/` and refreshes it weekly. Everything after that is local except the EDHREC lookup.
+On its first run the builder downloads Scryfall's bulk card database (~80 MB gzipped) and refreshes it
+weekly. It goes to your user cache (`~/.cache/magic-builder`, or `$XDG_CACHE_HOME`), **not** to the
+directory you happen to be in — set `MAGIC_BUILDER_CACHE` to put it elsewhere. An existing `.cache/`
+that is already ours is kept in place, so an older checkout does not re-download 80 MB. Everything
+after that is local except the EDHREC lookup.
 
 ## Arena collection
 
