@@ -15,7 +15,7 @@ from magic_builder.builders.standard import (
     build_standard_deck,
     deck_archetype as constructed_archetype,
 )
-from magic_builder.collection.arena import load_owned_cards
+from magic_builder.collection.arena import detect_collection_format, load_owned_cards
 from magic_builder.data import mtggoldfish
 from magic_builder.data.edhrec import recommend
 from magic_builder.data.scryfall import (
@@ -106,6 +106,19 @@ def main(collection_path: str, output: str, no_recs: bool, fmt: str, colors: str
 
     # ── 1. Parse collection ────────────────────────────────────────────────
     print(f"Parsing collection: {collection_path}")
+    # Detect before loading, so a file in no known format is refused rather than read as an Arena export
+    # and reported as "Found 0 unique card(s)" — which reads as a fact about the collection instead of a
+    # fact about the file. Everything downstream would then quietly work off an empty binder.
+    if detect_collection_format(collection_path) == "unknown":
+        # ClickException rather than sys.exit: it prints the message and nothing else. A traceback in
+        # front of "this file is not a collection" tells the user they broke something when they did not.
+        raise click.ClickException(
+            f"{collection_path} is not a collection file I recognise.\n"
+            f"  Supported: a ManaBox CSV export (has a 'Scryfall ID' column), an MTG Arena deck\n"
+            f"  export ('1 Sol Ring (TRC) 499' per line), or an Arena collection CSV scraped from\n"
+            f"  Player.log (has 'grp_id' and 'collector_number' columns).\n"
+            f"  Nothing was read."
+        )
     lookup, by_set_cn = load_scryfall_lookup()
     owned = load_owned_cards(collection_path, by_set_cn)
     print(f"Found {len(owned)} unique card(s) in your collection.")
@@ -145,7 +158,7 @@ def main(collection_path: str, output: str, no_recs: bool, fmt: str, colors: str
         click.echo(f"No {spec.label}-legal legendary creatures found in your collection.", err=True)
         sys.exit(1)
 
-    print(f"\nTop commander candidates:")
+    print("\nTop commander candidates:")
     for i, (cmd, score) in enumerate(commanders[:7]):
         ci = "".join(cmd.color_identity) or "C"
         print(f"  {i + 1:2}. {cmd.name:<40} [{ci}]  {int(score)} compatible cards")

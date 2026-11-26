@@ -27,6 +27,14 @@ collection*.csv
 *_collection.csv
 arena-export/
 
+# …but the committed test fixtures ARE tracked, and the patterns above would swallow two of them, since
+# they are also named collection*.csv. That failure is invisible here and fatal in CI: the suite passes on
+# a machine that has the files and fails everywhere else. Negated per-directory, so nothing outside
+# tests/fixtures/ is affected — a real collection dropped there would still be ignored only by luck, so
+# keep your exports out of that directory.
+!tests/fixtures/
+!tests/fixtures/*.csv
+
 # Env / secrets / local tool state
 .env
 .claude/

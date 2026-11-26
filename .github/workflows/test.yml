@@ -1,0 +1,90 @@
+name: tests
+
+# The suite is hermetic: committed fixtures, no network, no Scryfall cache, no API keys. It runs in
+# under a second, which is the point — a check slow enough to skip is a check that gets skipped.
+#
+# Runs on both branches: `main` is what people land on, `dev` is where the work happens, and a red
+# result on either should be visible before it reaches the other.
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor from pyproject, and the next one up: an install that works on the author's
+        # interpreter and not on a newer one is a failure you only find from a user.
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: The parsers
+        run: python -m pytest -q
+
+  fresh-install:
+    # A separate job because it asks a different question: not "is the code right" but "can a stranger
+    # start". It installs from a clean checkout and builds a deck from the committed fixture — no
+    # personal collection, no network, no EDHREC pass.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install, as a user would
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install .
+
+      - name: Build a deck from the committed fixture
+        run: |
+          set -euo pipefail
+          magic-builder tests/fixtures/collection_manabox.csv --no-recs -o /tmp/deck.txt
+          test -s /tmp/deck.txt
+          # A Commander deck is exactly 100 cards, and the decklist is the machine-readable half.
+          test -f /tmp/deck.decklist.txt
+          total=$(awk '{s+=$1} END {print s}' /tmp/deck.decklist.txt)
+          echo "deck size: $total"
+          test "$total" -eq 100
+
+      - name: The same fixture in all three formats
+        # The fixtures encode one collection in three shapes, so all three must produce the same deck.
+        # A per-format test passes while a format quietly drops a column it was not looking at.
+        run: |
+          set -euo pipefail
+          for f in collection_arena.txt collection_arena_log.csv; do
+            magic-builder "tests/fixtures/$f" --no-recs -o "/tmp/$f.txt"
+            total=$(awk '{s+=$1} END {print s}' "/tmp/$f.decklist.txt")
+            echo "$f -> $total cards"
+            test "$total" -eq 100
+          done
+
+      - name: Refuse a file in no known format
+        # The failure worth guarding: a wrong file used to be parsed as an Arena export and reported as
+        # "Found 0 unique card(s)", which reads as a fact about the collection instead of about the file.
+        run: |
+          set -euo pipefail
+          printf 'alpha,beta\n1,2\n' > /tmp/weird.csv
+          if magic-builder /tmp/weird.csv --no-recs -o /tmp/nope.txt 2>/tmp/err.txt; then
+            echo "::error::a file in no known format was accepted"
+            exit 1
+          fi
+          cat /tmp/err.txt
+          grep -q "is not a collection file I recognise" /tmp/err.txt

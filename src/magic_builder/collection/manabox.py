@@ -30,13 +30,36 @@ class OwnedCard:
     is_basic_filler: bool = False  # True when added as basic land padding
 
 
+def _report_unusable(kind: str, entries: list[str]) -> None:
+    """Say which rows were dropped, and how many.
+
+    Dropping a row is sometimes unavoidable — it cannot be matched, or it is missing the field the
+    lookup needs. Dropping it *silently* is not: the user's collection ends up quietly short, the deck
+    builder reports that they do not own a card they are holding, and nothing anywhere says why. The
+    count matters as much as the names, because it is the difference between "one odd line" and "this
+    export is not the format I thought".
+    """
+    if not entries:
+        return
+    print(f"  Warning: {len(entries)} {kind}:")
+    for entry in entries[:5]:
+        print(f"    {entry}")
+    if len(entries) > 5:
+        print(f"    ... and {len(entries) - 5} more")
+
+
 def parse_collection(csv_path: str) -> list:
     cards: dict[str, OwnedCard] = {}
+    unusable: list[str] = []
     with open(csv_path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            sid = row.get("Scryfall ID", "").strip()
+            sid = (row.get("Scryfall ID") or "").strip()
             if not sid:
+                # No id means no way to match the card against Scryfall or a deck, so it cannot be used.
+                # Named in the report rather than skipped in silence.
+                unusable.append(f"{row.get('Name', '?').strip() or '?'} "
+                                f"(no Scryfall ID; quantity {row.get('Quantity', '?')})")
                 continue
             qty = int(row.get("Quantity", 1))
             binder = (row.get("Binder Name") or "").strip()
@@ -53,4 +76,5 @@ def parse_collection(csv_path: str) -> list:
                 )
             if binder:
                 cards[sid].binders[binder] = cards[sid].binders.get(binder, 0) + qty
+    _report_unusable("card(s) skipped for having no Scryfall ID", unusable)
     return list(cards.values())

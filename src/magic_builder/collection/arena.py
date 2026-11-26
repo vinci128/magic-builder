@@ -1,7 +1,12 @@
 import csv
 import re
+import warnings
 
-from magic_builder.collection.manabox import OwnedCard, parse_collection
+from magic_builder.collection.manabox import (
+    OwnedCard,
+    _report_unusable,
+    parse_collection,
+)
 
 _LINE_RE = re.compile(r'^(\d+)\s+(.+?)\s+\(([A-Za-z0-9]+)\)\s+(\S+)$')
 
@@ -59,6 +64,7 @@ def parse_arena_log_csv(path: str, scryfall_by_set_cn: dict) -> list:
     (columns: grp_id,name,set,collector_number,quantity,...)."""
     cards: dict[str, OwnedCard] = {}
     missing: list[str] = []
+    unusable: list[str] = []
 
     with open(path, newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
@@ -71,6 +77,10 @@ def parse_arena_log_csv(path: str, scryfall_by_set_cn: dict) -> list:
             except ValueError:
                 qty = 1
             if not set_code or not cn:
+                # Without both halves of the key there is nothing to look up. Reported, not swallowed:
+                # a partial row usually means the scrape upstream went wrong, which the user should know.
+                unusable.append(f"{name or '?'} (missing "
+                                f"{'set' if not set_code else 'collector number'}; quantity {qty})")
                 continue
 
             data = scryfall_by_set_cn.get((set_code, cn))
@@ -90,32 +100,52 @@ def parse_arena_log_csv(path: str, scryfall_by_set_cn: dict) -> list:
                     set_code=data.get("set", ""),
                 )
 
-    if missing:
-        print(f"  Warning: {len(missing)} card(s) not matched in Scryfall data:")
-        for entry in missing[:5]:
-            print(f"    {entry}")
-        if len(missing) > 5:
-            print(f"    ... and {len(missing) - 5} more")
-
+    _report_unusable("card(s) not matched in Scryfall data", missing)
+    _report_unusable("row(s) skipped for missing set or collector number", unusable)
     return list(cards.values())
 
 
 def detect_collection_format(path: str) -> str:
-    """Return 'manabox', 'arena_log', or 'arena' by inspecting the first line of the file."""
+    """Return 'manabox', 'arena_log', 'arena', or 'unknown' by inspecting the first line.
+
+    'unknown' is a real answer. This used to fall back to 'arena', which meant a file in no known format
+    was confidently parsed as an Arena export and produced an empty collection with no complaint — the
+    worst way to fail, because "you own no cards" looks like a fact.
+    """
+    # The first *non-empty* line: a leading blank line is common in hand-edited exports, and treating
+    # it as the header would refuse a perfectly good file.
+    first_line = ""
     with open(path, encoding="utf-8") as f:
-        first_line = f.readline().strip()
+        for line in f:
+            if line.strip():
+                first_line = line.strip()
+                break
     if "Scryfall ID" in first_line or "Binder Name" in first_line:
         return "manabox"
     if "grp_id" in first_line and "collector_number" in first_line:
         return "arena_log"
-    return "arena"
+    if _LINE_RE.match(first_line) or first_line in ("Deck", "Sideboard", "Commander", "Companion"):
+        return "arena"
+    return "unknown"
 
 
 def load_owned_cards(path: str, scryfall_by_set_cn: dict) -> list:
-    """Parse a collection file in ManaBox CSV, Arena export, or Arena log-CSV format."""
+    """Parse a collection file in ManaBox CSV, Arena export, or Arena log-CSV format.
+
+    A file in none of those formats is refused with a warning rather than parsed as something it is not:
+    returning an empty collection silently would read as "you own no cards".
+    """
     fmt = detect_collection_format(path)
     if fmt == "arena_log":
         return parse_arena_log_csv(path, scryfall_by_set_cn)
     if fmt == "arena":
         return parse_arena_collection(path, scryfall_by_set_cn)
-    return parse_collection(path)
+    if fmt == "manabox":
+        return parse_collection(path)
+    warnings.warn(
+        f"{path}: not recognised as a ManaBox CSV, an Arena export, or an Arena log CSV — "
+        f"no cards read. Supported headers: 'Scryfall ID' or 'Binder Name' (ManaBox), "
+        f"'grp_id'+'collector_number' (Arena log), or lines like '1 Sol Ring (TRC) 499' (Arena export).",
+        UserWarning, stacklevel=2,
+    )
+    return []
