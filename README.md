@@ -1,8 +1,12 @@
 # Magic Deck Builder
 
+**[vinci128.github.io/magic-builder](https://vinci128.github.io/magic-builder/)** — a page with real
+output, if you would rather look before installing. ·
+[PyPI](https://pypi.org/project/magic-builder/)
+
 [![ko-fi](https://img.shields.io/badge/support-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/vinci128)
 
-Builds a Commander, Brawl, Standard or Pauper deck from your collection using Scryfall card data, heuristic role-filling, and EDHREC's real-world inclusion data. No LLM, no API key. Also exposes its core functions as MCP server tools so Claude can call them directly and iterate on decks conversationally.
+Builds a Commander, Brawl, Standard, Pauper or Modern deck from your collection using Scryfall card data, heuristic role-filling, and EDHREC's real-world inclusion data. No LLM, no API key. Also exposes its core functions as MCP server tools so Claude can call them directly and iterate on decks conversationally.
 
 ## Features
 
