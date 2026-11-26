@@ -31,12 +31,20 @@ Builds a Commander, Brawl, Standard or Pauper deck from your collection using Sc
 **Nothing, to have a look.** There is a small example collection bundled with the program:
 
 ```bash
-uvx --from git+https://github.com/vinci128/magic-builder magic-builder --demo
+uvx magic-builder --demo
 ```
 
 That builds a real 100-card Commander deck from 29 example cards, so you can see the output before
 exporting anything of your own. The first run downloads Scryfall's card database (below); that is the
 only time.
+
+**Install it:**
+
+```bash
+pip install magic-builder     # or: uv tool install magic-builder, pipx install magic-builder
+```
+
+On PyPI as [`magic-builder`](https://pypi.org/project/magic-builder/). Python 3.12 or newer.
 
 **Your own cards.** Export your collection from ManaBox as a CSV and pass it — nothing needs to be in
 the project directory:
