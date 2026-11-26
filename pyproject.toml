@@ -3,8 +3,27 @@ name = "magic-builder"
 version = "0.1.0"
 description = "Build Commander, Brawl, Standard and Pauper decks from the cards you own"
 readme = "README.md"
-license = { file = "LICENSE" }
+# The SPDX expression, not `{ file = "LICENSE" }`. Pointing at the file copies its entire text into the
+# metadata, and PyPI renders that as a wall of licence in the sidebar instead of saying "MIT".
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
+# Matches the LICENSE and the GitHub handle. Change it here and PyPI shows the new one on the next
+# release only — an upload's metadata is permanent.
+authors = [{ name = "vinci128" }]
+keywords = ["mtg", "magic-the-gathering", "commander", "edh", "deck-building", "scryfall", "manabox"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: End Users/Desktop",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Games/Entertainment :: Board Games",
+  "Topic :: Utilities",
+]
 dependencies = [
     "click>=8.0",
     "fastapi>=0.115",
@@ -19,6 +38,11 @@ dependencies = [
 magic-builder = "magic_builder.cli:main"
 magic-builder-web = "magic_builder.web.app:main"
 magic-builder-mcp = "magic_builder.mcp_server:main"
+
+[project.urls]
+Homepage = "https://github.com/vinci128/magic-builder"
+Repository = "https://github.com/vinci128/magic-builder"
+Issues = "https://github.com/vinci128/magic-builder/issues"
 
 [project.optional-dependencies]
 # The test suite. Separate from the runtime deps because nothing it needs ships to a user: the parser
